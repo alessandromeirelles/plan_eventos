@@ -1,0 +1,8 @@
+{
+  "name": "PlanEventos",
+  "description": "Uma plataforma inteligente para freelancers criativos (fotógrafos e videomakers) gerenciarem eventos, clientes e finanças com integração e automação.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

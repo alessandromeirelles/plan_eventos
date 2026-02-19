@@ -1,0 +1,67 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PlanEventos</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#F47920",
+                        "brand-navy": "#002D56",
+                        "brand-orange": "#F47920",
+                        "brand-cyan": "#002D56", // Mapeado para o azul para manter compatibilidade
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#121c20",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    keyframes: {
+                        swing: {
+                            '0%, 100%': { transform: 'rotate(0deg)' },
+                            '10%, 30%, 50%, 70%, 90%': { transform: 'rotate(-10deg)' },
+                            '20%, 40%, 60%, 80%': { transform: 'rotate(10deg)' },
+                        }
+                    },
+                    animation: {
+                        swing: 'swing 2s ease-in-out infinite',
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Manrope', sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .ios-blur { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #F47920; border-radius: 10px; }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.41.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.45.4"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100">
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
