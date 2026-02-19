@@ -120,7 +120,7 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
           <div className="w-8"></div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 pb-32 no-scrollbar">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 pb-48 no-scrollbar">
           <section className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Informações Gerais</h2>
             <div className="space-y-1.5">

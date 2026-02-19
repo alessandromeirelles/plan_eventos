@@ -198,7 +198,7 @@ const App: React.FC = () => {
     switch (currentView) {
       case 'LANDING': return <Landing onNavigate={setCurrentView} />;
       case 'AUTH': return <Auth onLogin={(u) => { setUser(u); setCurrentView('DASHBOARD'); }} onCancel={() => setCurrentView('LANDING')} />;
-      case 'DASHBOARD': return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getTrialDaysLeft()} />;
+      case 'DASHBOARD': return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getTrialDaysLeft()} user={user} />;
       case 'EVENTS': return <EventList events={events} onDelete={handleDeleteEvent} onEdit={(e) => { setEditingEvent(e); setCurrentView('EDIT_EVENT'); }} onNavigate={setCurrentView} onNew={() => { setEditingEvent(null); setCurrentView('NEW_EVENT'); }} />;
       case 'COMPANIES': return <CompanyList companies={companies} onNavigate={setCurrentView} onNew={() => setCurrentView('NEW_COMPANY')} />;
       case 'NEW_EVENT':
@@ -217,7 +217,7 @@ const App: React.FC = () => {
           />
         ) : null;
       case 'CHECKOUT': return <Checkout plan={selectedPlan} onSuccess={() => setCurrentView('DASHBOARD')} onCancel={() => setCurrentView('LANDING')} />;
-      default: return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getTrialDaysLeft()} />;
+      default: return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getTrialDaysLeft()} user={user} />;
     }
   };
 
