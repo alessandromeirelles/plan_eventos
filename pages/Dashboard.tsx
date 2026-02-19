@@ -19,7 +19,46 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
     const today = new Date().toISOString().split('T')[0];
     const filtered = events.filter(e => e.date === today);
     setTodayEvents(filtered);
+
+    if (filtered.length > 0) {
+      const lastNotified = localStorage.getItem('lastNotifiedDate');
+      if (lastNotified !== today) {
+        const handleFirstInteraction = () => {
+          try {
+            const audio = new Audio('https://actions.google.com/sounds/v1/alarms/chime_bell_ding.ogg');
+            audio.play().catch(e => console.log('Audio autoplay blocked:', e));
+          } catch (e) {
+            console.log('Audio error:', e);
+          }
+
+          if ('Notification' in window) {
+            if (Notification.permission === 'granted') {
+              new Notification('PlanEventos', {
+                body: `Você tem ${filtered.length} evento(s) hoje!`,
+                icon: '/vite.svg'
+              });
+            }
+          }
+          
+          localStorage.setItem('lastNotifiedDate', today);
+          document.removeEventListener('click', handleFirstInteraction);
+        };
+        
+        document.addEventListener('click', handleFirstInteraction);
+        return () => document.removeEventListener('click', handleFirstInteraction);
+      }
+    }
   }, [events]);
+
+  const requestNotificationPermission = () => {
+    if ('Notification' in window) {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          alert('Notificações ativadas com sucesso!');
+        }
+      });
+    }
+  };
 
   const totalValue = events.reduce((acc, curr) => acc + curr.value, 0);
 
@@ -45,10 +84,39 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
           </div>
         </div>
         <div className="flex items-center gap-2 w-10 justify-end relative">
-          <button onClick={() => setShowNotifications(!showNotifications)} className="p-2 rounded-full">
+          <button onClick={() => setShowNotifications(!showNotifications)} className="p-2 rounded-full relative">
             <span className={`material-symbols-outlined text-brand-navy dark:text-slate-400 ${todayEvents.length > 0 ? 'animate-[swing_2s_ease-in-out_infinite]' : ''}`}>notifications</span>
             {todayEvents.length > 0 && <span className="absolute top-1.5 right-1.5 size-2.5 bg-brand-orange border-2 border-white dark:border-background-dark rounded-full"></span>}
           </button>
+          
+          {showNotifications && (
+            <div className="absolute top-12 right-0 w-72 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 p-4 z-50 animate-in slide-in-from-top-2">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-bold text-slate-800 dark:text-white text-sm">Notificações</h3>
+                {'Notification' in window && Notification.permission !== 'granted' && (
+                  <button 
+                    onClick={requestNotificationPermission}
+                    className="text-[9px] bg-brand-orange text-white px-2 py-1 rounded-md font-bold uppercase tracking-wider"
+                  >
+                    Ativar Alertas
+                  </button>
+                )}
+              </div>
+              {todayEvents.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Você tem {todayEvents.length} evento(s) hoje:</p>
+                  {todayEvents.map(e => (
+                    <div key={e.id} className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
+                      <p className="text-sm font-bold text-brand-navy dark:text-white truncate">{e.title}</p>
+                      <p className="text-[10px] text-slate-500 truncate">{e.location || 'Local a definir'}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-4">Nenhum evento para hoje.</p>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
