@@ -8,17 +8,19 @@ interface Props {
 }
 
 const Checkout: React.FC<Props> = ({ plan, onSuccess, onCancel }) => {
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>(plan);
   const [method, setMethod] = useState<'CARD' | 'PIX'>('CARD');
   const [isProcessing, setIsProcessing] = useState(false);
-  const price = plan === 'monthly' ? '9,90' : '99,90';
-  const period = plan === 'monthly' ? 'mês' : 'ano';
+  
+  const price = selectedPlan === 'monthly' ? '9,90' : '99,90';
+  const period = selectedPlan === 'monthly' ? 'mês' : 'ano';
 
   const handlePayment = () => {
     setIsProcessing(true);
     // Simula processamento de 2 segundos
     setTimeout(() => {
       setIsProcessing(false);
-      onSuccess(plan);
+      onSuccess(selectedPlan);
     }, 2500);
   };
 
@@ -48,12 +50,31 @@ const Checkout: React.FC<Props> = ({ plan, onSuccess, onCancel }) => {
       </header>
 
       <div className="p-6">
+        {/* Escolha de Plano */}
+        <div className="mb-6">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Escolha seu Plano</p>
+          <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-2xl">
+            <button 
+              onClick={() => setSelectedPlan('monthly')}
+              className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition-all ${selectedPlan === 'monthly' ? 'bg-white dark:bg-slate-800 text-brand-cyan shadow-sm' : 'text-slate-400'}`}
+            >
+              Mensal
+            </button>
+            <button 
+              onClick={() => setSelectedPlan('yearly')}
+              className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition-all ${selectedPlan === 'yearly' ? 'bg-white dark:bg-slate-800 text-brand-cyan shadow-sm' : 'text-slate-400'}`}
+            >
+              Anual
+            </button>
+          </div>
+        </div>
+
         {/* Resumo do Pedido */}
         <div className="bg-slate-50 dark:bg-slate-900 rounded-3xl p-6 mb-8 border border-slate-100 dark:border-slate-800">
           <div className="flex justify-between items-center mb-4">
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Plano Selecionado</p>
-              <h2 className="text-lg font-black text-brand-cyan uppercase">{plan === 'monthly' ? 'Mensal Profissional' : 'Anual Premium'}</h2>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resumo</p>
+              <h2 className="text-lg font-black text-brand-cyan uppercase">{selectedPlan === 'monthly' ? 'Mensal Profissional' : 'Anual Premium'}</h2>
             </div>
             <div className="text-right">
               <p className="text-xl font-black text-slate-900 dark:text-white">R$ {price}</p>

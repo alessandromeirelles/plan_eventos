@@ -5,10 +5,12 @@ import { User, ViewState } from '../types';
 interface Props {
   user: User;
   onUpdateUser: (updatedUser: User) => Promise<boolean>;
+  onNavigate: (view: ViewState) => void;
+  onSelectPlan: (plan: 'monthly' | 'yearly') => void;
   onLogout: () => void;
 }
 
-const Settings: React.FC<Props> = ({ user, onUpdateUser, onLogout }) => {
+const Settings: React.FC<Props> = ({ user, onUpdateUser, onNavigate, onSelectPlan, onLogout }) => {
   const [formData, setFormData] = useState<User>({ ...user });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -126,6 +128,47 @@ const Settings: React.FC<Props> = ({ user, onUpdateUser, onLogout }) => {
                   onChange={e => setFormData({...formData, cnpj: e.target.value})}
                   placeholder="00.000.000/0001-00"
                 />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Assinatura */}
+        <section className="space-y-4">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Assinatura & Planos</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] p-6 shadow-sm border border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <p className="text-xs font-black text-brand-navy dark:text-white uppercase">Status do Plano</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Período de Teste (30 dias)</p>
+              </div>
+              <span className="px-3 py-1 bg-amber-100 text-amber-600 rounded-full text-[10px] font-black uppercase">Trial</span>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-black text-brand-navy dark:text-white">Mensal Profissional</p>
+                  <p className="text-[10px] font-bold text-slate-400">R$ 9,90 / mês</p>
+                </div>
+                <button 
+                  onClick={() => { onSelectPlan('monthly'); onNavigate('CHECKOUT'); }}
+                  className="bg-brand-orange text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase"
+                >
+                  Assinar
+                </button>
+              </div>
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-black text-brand-navy dark:text-white">Anual Premium</p>
+                  <p className="text-[10px] font-bold text-slate-400">R$ 99,90 / ano</p>
+                </div>
+                <button 
+                  onClick={() => { onSelectPlan('yearly'); onNavigate('CHECKOUT'); }}
+                  className="bg-brand-orange text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase"
+                >
+                  Assinar
+                </button>
               </div>
             </div>
           </div>

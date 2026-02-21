@@ -12,10 +12,15 @@ interface Props {
 
 const EventList: React.FC<Props> = ({ events, onDelete, onEdit, onNavigate, onNew }) => {
   const [activeTab, setActiveTab] = useState<'Todos' | EventStatus>('Todos');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
-  const filteredEvents = activeTab === 'Todos' 
-    ? events 
-    : events.filter(e => e.status === activeTab);
+  const filteredEvents = events.filter(e => {
+    const matchStatus = activeTab === 'Todos' || e.status === activeTab;
+    const matchStart = startDate ? e.date >= startDate : true;
+    const matchEnd = endDate ? e.date <= endDate : true;
+    return matchStatus && matchStart && matchEnd;
+  });
 
   const totalValue = filteredEvents.reduce((acc, curr) => acc + curr.value, 0);
 
@@ -62,13 +67,44 @@ const EventList: React.FC<Props> = ({ events, onDelete, onEdit, onNavigate, onNe
         </div>
         
         <div className="px-4 pb-4 pt-1">
-          <div className="relative">
+          <div className="relative mb-3">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
             <input 
               className="block w-full pl-10 pr-4 py-3 bg-slate-100 dark:bg-slate-900 border-none rounded-xl text-sm focus:ring-2 focus:ring-primary dark:text-white"
               placeholder="Buscar eventos ou clientes..."
               type="text"
             />
+          </div>
+          
+          <div className="flex gap-2">
+            <div className="flex-1 space-y-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">De</label>
+              <input 
+                type="date" 
+                value={startDate} 
+                onChange={e => setStartDate(e.target.value)} 
+                className="w-full bg-slate-100 dark:bg-slate-900 border-none rounded-xl text-xs py-2 px-3 focus:ring-2 focus:ring-primary dark:text-white" 
+              />
+            </div>
+            <div className="flex-1 space-y-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Até</label>
+              <input 
+                type="date" 
+                value={endDate} 
+                onChange={e => setEndDate(e.target.value)} 
+                className="w-full bg-slate-100 dark:bg-slate-900 border-none rounded-xl text-xs py-2 px-3 focus:ring-2 focus:ring-primary dark:text-white" 
+              />
+            </div>
+            {(startDate || endDate) && (
+              <div className="flex items-end pb-0.5">
+                <button 
+                  onClick={() => { setStartDate(''); setEndDate(''); }} 
+                  className="p-2 bg-slate-200 dark:bg-slate-800 rounded-xl text-slate-500 hover:text-red-500 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

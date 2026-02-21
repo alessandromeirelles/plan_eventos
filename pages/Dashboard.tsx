@@ -131,9 +131,18 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
               <h2 className="text-2xl font-black text-brand-navy dark:text-white tracking-tight">Dashboard</h2>
             </div>
             
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-navy text-white shadow-lg mb-4">
-              <span className="material-symbols-outlined text-sm text-brand-orange animate-pulse">lock_clock</span>
-              <span className="text-[10px] font-black uppercase tracking-widest">{trialDaysLeft} dias de licença</span>
+            <div className="flex flex-wrap items-center gap-2 mb-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-navy text-white shadow-lg">
+                <span className="material-symbols-outlined text-sm text-brand-orange animate-pulse">lock_clock</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">{trialDaysLeft} dias de licença</span>
+              </div>
+              <button 
+                onClick={() => onNavigate('CHECKOUT')}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-orange text-white shadow-lg active:scale-95 transition-all"
+              >
+                <span className="material-symbols-outlined text-sm">workspace_premium</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">Assinar Agora</span>
+              </button>
             </div>
           </div>
           <div className="flex flex-col items-center gap-2 shrink-0">

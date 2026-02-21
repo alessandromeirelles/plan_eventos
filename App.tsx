@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ViewState, PlanEvent, Company, EventStatus, User } from './types';
+import { ViewState, PlanEvent, Company, User } from './types';
 import { MOCK_EVENTS, MOCK_COMPANIES } from './constants';
 import { supabase } from './supabaseClient';
 import Landing from './pages/Landing';
@@ -18,11 +18,12 @@ const DEFAULT_EVENT_TYPES = ['Workshop', 'Casamento', 'Corporativo', 'Aniversár
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<ViewState>('LANDING');
-  const [events, setEvents] = useState<PlanEvent[]>(MOCK_EVENTS);
-  const [companies, setCompanies] = useState<Company[]>(MOCK_COMPANIES);
+  const [events, setEvents] = useState<PlanEvent[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [eventTypes, setEventTypes] = useState<string[]>(DEFAULT_EVENT_TYPES);
   const [editingEvent, setEditingEvent] = useState<PlanEvent | null>(null);
   const [loading, setLoading] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('monthly');
 
   useEffect(() => {
@@ -76,27 +77,32 @@ const App: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true);
+    setConnectionError(null);
     try {
       const [eventsRes, companiesRes] = await Promise.all([
         supabase.from('events').select('*').order('date', { ascending: true }),
         supabase.from('companies').select('*').order('name')
       ]);
 
-      if (eventsRes.data) {
-        setEvents(eventsRes.data);
-      }
-      if (companiesRes.data) {
-        setCompanies(companiesRes.data);
-      }
-    } catch (error) {
+      if (eventsRes.error) throw eventsRes.error;
+      if (companiesRes.error) throw companiesRes.error;
+
+      if (eventsRes.data) setEvents(eventsRes.data);
+      if (companiesRes.data) setCompanies(companiesRes.data);
+    } catch (error: any) {
       console.error("Erro ao carregar dados:", error);
+      if (error.message === 'Failed to fetch') {
+        setConnectionError("Não foi possível conectar ao banco de dados. Verifique se o projeto Supabase está ativo.");
+      } else {
+        setConnectionError(error.message);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const getTrialDaysLeft = () => {
-    return 30; // Sempre 30 no modo mock
+    return 30;
   };
 
   const handleSaveEvent = async (event: PlanEvent) => {
@@ -105,7 +111,6 @@ const App: React.FC = () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) return;
 
-      // Se o ID for temporário (começa com EV-), removemos para o Supabase gerar um UUID
       const isNew = event.id.startsWith('EV-');
       const { id, ...dataToSave } = event;
       
@@ -121,11 +126,12 @@ const App: React.FC = () => {
 
       if (error) throw error;
       
+      alert("Evento salvo com sucesso!");
       await fetchData();
       setCurrentView('EVENTS');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao salvar evento:", error);
-      alert("Erro ao salvar evento no banco de dados. Verifique se as tabelas existem.");
+      alert(`Erro ao salvar evento: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -138,7 +144,7 @@ const App: React.FC = () => {
       if (!authUser) return;
 
       const companyData = { ...newCompany, user_id: authUser.id };
-      delete (companyData as any).id; // Deixa o Supabase gerar o ID se for novo
+      delete (companyData as any).id;
 
       const { error } = await supabase
         .from('companies')
@@ -146,11 +152,12 @@ const App: React.FC = () => {
 
       if (error) throw error;
       
+      alert("Cliente adicionado com sucesso!");
       await fetchData();
       setCurrentView('COMPANIES');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao adicionar cliente:", error);
-      alert("Erro ao salvar cliente no banco de dados.");
+      alert(`Erro ao salvar cliente: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -209,6 +216,8 @@ const App: React.FC = () => {
           <Settings 
             user={user} 
             onUpdateUser={handleUpdateUser} 
+            onNavigate={setCurrentView}
+            onSelectPlan={setSelectedPlan}
             onLogout={async () => { 
               await supabase.auth.signOut();
               setUser(null); 
@@ -225,6 +234,18 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark max-w-[430px] mx-auto relative shadow-2xl overflow-x-hidden border-x border-primary/10">
+      {connectionError && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-[380px] bg-red-600 text-white p-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top duration-300">
+          <span className="material-symbols-outlined">cloud_off</span>
+          <div className="flex-1">
+            <p className="text-xs font-black uppercase tracking-widest">Erro de Conexão</p>
+            <p className="text-[10px] font-bold opacity-90 leading-tight">{connectionError}</p>
+          </div>
+          <button onClick={() => setConnectionError(null)} className="p-1 hover:bg-white/10 rounded-full">
+            <span className="material-symbols-outlined text-sm">close</span>
+          </button>
+        </div>
+      )}
       {renderView()}
       {showNavbar && (
         <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-full max-w-[430px] bg-white/90 dark:bg-background-dark/90 ios-blur border-t border-primary/10 px-6 pt-3 pb-8 flex justify-between items-center">

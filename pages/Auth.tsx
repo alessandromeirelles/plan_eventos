@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import Logo from '../components/Logo';
-import { supabase, getErrorMessage } from '../supabaseClient';
+import { supabase, getErrorMessage, testSupabaseConnection } from '../supabaseClient';
 
 interface Props {
   onLogin: (user: User) => void;
@@ -32,6 +32,12 @@ const Auth: React.FC<Props> = ({ onLogin, onCancel }) => {
         if (authError) throw authError;
 
         if (data.user) {
+          // Test connection to verify tables
+          const { success, message } = await testSupabaseConnection();
+          if (!success && message.includes('Tabelas não encontradas')) {
+            alert("Atenção: Sua conta foi acessada, mas as tabelas do banco de dados não foram encontradas. Peça ao administrador para rodar o script SQL de configuração.");
+          }
+
           const meta = data.user.user_metadata;
           onLogin({
             email: data.user.email || '',
