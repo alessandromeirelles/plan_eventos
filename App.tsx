@@ -46,8 +46,10 @@ const App: React.FC = () => {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Supabase Auth Event:", event);
       if (session?.user) {
+        console.log("Sessão ativa para:", session.user.email);
         const meta = session.user.user_metadata;
         const u: User = {
           email: session.user.email || '',
@@ -61,6 +63,7 @@ const App: React.FC = () => {
         };
         setUser(u);
       } else {
+        console.log("Nenhuma sessão encontrada.");
         setUser(null);
         setCurrentView('LANDING');
       }
@@ -76,26 +79,31 @@ const App: React.FC = () => {
   }, [user]);
 
   const fetchData = async () => {
+    if (!user) return;
     setLoading(true);
     setConnectionError(null);
     try {
+      console.log("Buscando dados para o usuário...");
       const [eventsRes, companiesRes] = await Promise.all([
         supabase.from('events').select('*').order('date', { ascending: true }),
         supabase.from('companies').select('*').order('name')
       ]);
 
-      if (eventsRes.error) throw eventsRes.error;
-      if (companiesRes.error) throw companiesRes.error;
+      if (eventsRes.error) {
+        console.error("Erro events:", eventsRes.error);
+        throw eventsRes.error;
+      }
+      if (companiesRes.error) {
+        console.error("Erro companies:", companiesRes.error);
+        throw companiesRes.error;
+      }
 
+      console.log(`Dados carregados: ${eventsRes.data?.length} eventos, ${companiesRes.data?.length} empresas`);
       if (eventsRes.data) setEvents(eventsRes.data);
       if (companiesRes.data) setCompanies(companiesRes.data);
     } catch (error: any) {
       console.error("Erro ao carregar dados:", error);
-      if (error.message === 'Failed to fetch') {
-        setConnectionError("Não foi possível conectar ao banco de dados. Verifique se o projeto Supabase está ativo.");
-      } else {
-        setConnectionError(error.message);
-      }
+      setConnectionError(error.message || "Erro ao conectar com o banco de dados.");
     } finally {
       setLoading(false);
     }
