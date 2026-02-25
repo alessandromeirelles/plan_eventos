@@ -166,7 +166,7 @@ const EventList: React.FC<Props> = ({ events, onDelete, onEdit, onNavigate, onNe
               <div className="grid grid-cols-2 gap-y-2 text-sm mb-4">
                 <div className="flex items-center gap-2 text-slate-500">
                   <span className="material-symbols-outlined text-sm">calendar_month</span>
-                  <span>{new Date(event.date).toLocaleDateString('pt-BR')}</span>
+                  <span>{event.date.split('-').reverse().join('/')}</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-500">
                   <span className="material-symbols-outlined text-sm">business</span>

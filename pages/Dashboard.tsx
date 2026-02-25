@@ -72,6 +72,11 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
     return company?.icon || 'corporate_fare';
   };
 
+  const todayStr = new Date().toISOString().split('T')[0];
+  const upcomingEvents = events
+    .filter(e => e.date >= todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
   return (
     <div className="pb-32 animate-in fade-in duration-700 relative">
       <header className="sticky top-0 z-50 bg-white dark:bg-background-dark/95 ios-blur px-4 h-16 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 shadow-sm">
@@ -168,7 +173,7 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
             <h2 className="text-xl font-extrabold text-brand-navy dark:text-white tracking-tight">Agenda Próxima</h2>
             <button onClick={() => onNavigate('EVENTS')} className="text-xs font-bold text-brand-orange uppercase tracking-widest hover:underline">Ver Todos</button>
           </div>
-          {events.slice(0, 4).map((event) => {
+          {upcomingEvents.slice(0, 4).map((event) => {
             const logoUrl = getCompanyLogo(event.company_id);
             return (
               <div key={event.id} onClick={() => onNavigate('EVENTS')} className="flex items-center gap-4 p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-50 dark:border-slate-800 shadow-sm cursor-pointer group hover:border-brand-orange/30 transition-all">
@@ -181,11 +186,21 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
                     <span className="text-[10px] font-black text-slate-400 uppercase">{event.type}</span>
                     <span className="text-[10px] font-black text-brand-orange">R$ {event.value.toLocaleString('pt-BR')}</span>
                   </div>
+                  <div className="flex items-center gap-1 mt-1.5 text-slate-500">
+                    <span className="material-symbols-outlined text-[10px]">calendar_month</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest">{event.date.split('-').reverse().join('/')}</span>
+                  </div>
                 </div>
                 <span className="material-symbols-outlined text-slate-200 group-hover:text-brand-orange transition-colors">arrow_forward_ios</span>
               </div>
             );
           })}
+          {upcomingEvents.length === 0 && (
+            <div className="text-center py-8 opacity-50">
+              <span className="material-symbols-outlined text-4xl mb-2">event_busy</span>
+              <p className="text-xs font-bold uppercase tracking-widest">Nenhum evento futuro</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

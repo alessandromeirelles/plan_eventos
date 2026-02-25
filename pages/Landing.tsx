@@ -1,24 +1,13 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { ViewState } from '../types';
 import Logo from '../components/Logo';
-import { testSupabaseConnection } from '../supabaseClient';
 
 interface Props {
   onNavigate: (view: ViewState) => void;
 }
 
 const Landing: React.FC<Props> = ({ onNavigate }) => {
-  const [testStatus, setTestStatus] = useState<{ success: boolean; message: string } | null>(null);
-  const [isTesting, setIsTesting] = useState(false);
-
-  const handleTestConnection = async () => {
-    setIsTesting(true);
-    const result = await testSupabaseConnection();
-    setTestStatus(result);
-    setIsTesting(false);
-  };
-
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <nav className="sticky top-0 z-50 flex items-center justify-center bg-white/95 backdrop-blur-md px-4 py-4 border-b border-slate-100 shadow-sm">
@@ -48,27 +37,6 @@ const Landing: React.FC<Props> = ({ onNavigate }) => {
             <span>Começar Agora</span>
           </button>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Teste Grátis por 30 dias • Sem Cartão</p>
-
-          <div className="mt-8 pt-8 border-t border-slate-100 w-full">
-            <button 
-              onClick={handleTestConnection}
-              disabled={isTesting}
-              className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center justify-center gap-2 mx-auto hover:text-brand-navy transition-colors"
-            >
-              {isTesting ? (
-                <div className="size-3 border-2 border-slate-200 border-t-slate-400 rounded-full animate-spin"></div>
-              ) : (
-                <span className="material-symbols-outlined text-sm">database</span>
-              )}
-              Verificar Conexão Supabase
-            </button>
-            
-            {testStatus && (
-              <div className={`mt-3 p-3 rounded-xl text-[10px] font-bold uppercase tracking-wider animate-in fade-in slide-in-from-top-1 ${testStatus.success ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
-                {testStatus.message}
-              </div>
-            )}
-          </div>
         </div>
 
         <div className="mt-20 flex flex-col items-center gap-4">

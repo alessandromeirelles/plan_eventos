@@ -254,19 +254,18 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
               </div>
             </div>
           </section>
-        </form>
 
-        <div className="absolute bottom-0 left-0 right-0 p-6 bg-white dark:bg-background-dark border-t border-gray-100 dark:border-gray-800 flex flex-col gap-3">
-          <button 
-            type="submit"
-            form="event-form"
-            className="w-full bg-brand-orange hover:bg-orange-600 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2"
-          >
-            <span className="material-symbols-outlined text-lg">check_circle</span>
-            <span>Salvar</span>
-          </button>
-          <button type="button" onClick={onCancel} className="w-full py-3 text-gray-500 font-semibold">Cancelar</button>
-        </div>
+          <div className="absolute bottom-0 left-0 right-0 p-6 bg-white dark:bg-background-dark border-t border-gray-100 dark:border-gray-800 flex flex-col gap-3">
+            <button 
+              type="submit"
+              className="w-full bg-brand-orange hover:bg-orange-600 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2"
+            >
+              <span className="material-symbols-outlined text-lg">check_circle</span>
+              <span>Salvar</span>
+            </button>
+            <button type="button" onClick={onCancel} className="w-full py-3 text-gray-500 font-semibold">Cancelar</button>
+          </div>
+        </form>
       </div>
     </div>
   );

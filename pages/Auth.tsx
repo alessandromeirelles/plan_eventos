@@ -1,8 +1,15 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import Logo from '../components/Logo';
-import { supabase, getErrorMessage, testSupabaseConnection } from '../supabaseClient';
+import { auth, getErrorMessage } from '../firebaseConfig';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  sendPasswordResetEmail, 
+  updatePassword,
+  updateProfile
+} from 'firebase/auth';
 
 interface Props {
   onLogin: (user: User) => void;
@@ -20,124 +27,74 @@ const Auth: React.FC<Props> = ({ onLogin, onCancel }) => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Detect recovery flow
-  React.useEffect(() => {
-    const handleRecovery = async () => {
-      const hash = window.location.hash;
-      if (hash && hash.includes('type=recovery')) {
-        setIsUpdatingPassword(true);
-        setIsLogin(false);
-        setIsForgotPassword(false);
-      }
-    };
-    handleRecovery();
+  useEffect(() => {
+    // Check if we are in a password reset flow
+    const urlParams = new URLSearchParams(window.location.search);
+    const mode = urlParams.get('mode');
+    if (mode === 'resetPassword') {
+      setIsUpdatingPassword(true);
+      setIsLogin(false);
+      setIsForgotPassword(false);
+    }
   }, []);
-
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: password
-      });
-      if (updateError) throw updateError;
-      
-      alert("Senha atualizada com sucesso! Agora você pode fazer login.");
-      setIsUpdatingPassword(false);
-      setIsLogin(true);
-      setPassword('');
-    } catch (err: any) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccessMessage(null);
-
-    try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}`,
-      });
-
-      if (resetError) throw resetError;
-
-      setSuccessMessage('E-mail de recuperação enviado! Verifique sua caixa de entrada.');
-    } catch (err: any) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isUpdatingPassword) {
-      return handleUpdatePassword(e);
-    }
-    if (isForgotPassword) {
-      return handleForgotPassword(e);
-    }
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
 
     try {
-      if (isLogin) {
-        const { data, error: authError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (authError) {
-          throw authError;
-        }
-
-        if (data.user) {
-          console.log("Login realizado com sucesso para:", data.user.email);
-          // Test connection to verify tables
-          const { success, message } = await testSupabaseConnection();
-          if (!success && message.includes('Tabelas não encontradas')) {
-            alert("Atenção: Sua conta foi acessada, mas as tabelas do banco de dados não foram encontradas. Peça ao administrador para rodar o script SQL de configuração.");
-          }
-
-          const meta = data.user.user_metadata;
-          onLogin({
-            email: data.user.email || '',
-            name: meta?.name || data.user.email?.split('@')[0] || 'Usuário',
-            photo: meta?.photo || meta?.avatar_url || '',
-            bio: meta?.bio || '',
-            company_name: meta?.company_name || '',
-            cnpj: meta?.cnpj || '',
-            subscription_status: 'trial',
-            trial_start_date: data.user.created_at
-          });
-        }
-      } else {
-        const { data, error: authError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              name: name,
-            }
-          }
-        });
-
-        if (authError) {
-          throw authError;
-        }
-        
-        if (data.user) {
-          console.log("Cadastro realizado:", data.user.email);
-          alert('Cadastro realizado com sucesso!\n\nIMPORTANTE: Verifique seu e-mail (inclusive a pasta SPAM) para confirmar sua conta antes de tentar fazer o login.');
+      if (isUpdatingPassword) {
+        const user = auth.currentUser;
+        if (user) {
+          await updatePassword(user, password);
+          alert("Senha atualizada com sucesso! Agora você pode fazer login.");
+          setIsUpdatingPassword(false);
           setIsLogin(true);
+          setPassword('');
+        } else {
+          setError("Usuário não autenticado para atualizar a senha.");
         }
+        setLoading(false);
+        return;
+      }
+      
+      if (isForgotPassword) {
+        await sendPasswordResetEmail(auth, email);
+        setSuccessMessage('E-mail de recuperação enviado! Verifique sua caixa de entrada.');
+        setLoading(false);
+        return;
+      }
+
+      if (isLogin) {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        onLogin({
+          email: user.email || '',
+          name: user.displayName || user.email?.split('@')[0] || 'Usuário',
+          photo: user.photoURL || '',
+          bio: '',
+          company_name: '',
+          cnpj: '',
+          subscription_status: 'trial',
+          trial_start_date: user.metadata.creationTime || new Date().toISOString()
+        });
+      } else {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        await updateProfile(user, { displayName: name });
+        
+        onLogin({
+          email: user.email || '',
+          name: name || user.email?.split('@')[0] || 'Usuário',
+          photo: user.photoURL || '',
+          bio: '',
+          company_name: '',
+          cnpj: '',
+          subscription_status: 'trial',
+          trial_start_date: user.metadata.creationTime || new Date().toISOString()
+        });
       }
     } catch (err: any) {
       setError(getErrorMessage(err));
@@ -160,16 +117,6 @@ const Auth: React.FC<Props> = ({ onLogin, onCancel }) => {
             <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-2xl text-red-600 dark:text-red-400 text-xs font-bold mb-2">
               {error}
             </div>
-            {error.includes('E-mail ou senha incorretos') && (
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl text-blue-600 dark:text-blue-400 text-[10px] font-medium text-left">
-                <p className="font-bold mb-1 uppercase tracking-wider">Dica:</p>
-                <ul className="list-disc ml-3 space-y-1">
-                  <li>Verifique se o e-mail foi digitado corretamente.</li>
-                  <li>Se você se cadastrou agora, cheque sua pasta de SPAM para o e-mail de confirmação.</li>
-                  <li>Tente criar uma nova conta se não tiver certeza dos dados.</li>
-                </ul>
-              </div>
-            )}
           </div>
         )}
 

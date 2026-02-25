@@ -8,18 +8,53 @@ interface Props {
   onNavigate: (view: ViewState) => void;
   onSelectPlan: (plan: 'monthly' | 'yearly') => void;
   onLogout: () => void;
+  onShowSuccess: (message: string) => void;
 }
 
-const Settings: React.FC<Props> = ({ user, onUpdateUser, onNavigate, onSelectPlan, onLogout }) => {
+const Settings: React.FC<Props> = ({ user, onUpdateUser, onNavigate, onSelectPlan, onLogout, onShowSuccess }) => {
   const [formData, setFormData] = useState<User>({ ...user });
   const [isSaving, setIsSaving] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("A imagem é muito grande! Por favor, escolha uma imagem com menos de 5MB.");
+        return;
+      }
+
+      setIsSaving(true);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData({ ...formData, photo: reader.result as string });
+        const img = new Image();
+        img.src = reader.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDimension = 200;
+
+          if (width > height) {
+            if (width > maxDimension) {
+              height *= maxDimension / width;
+              width = maxDimension;
+            }
+          } else {
+            if (height > maxDimension) {
+              width *= maxDimension / height;
+              height = maxDimension;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          setFormData({ ...formData, photo: compressedBase64 });
+          setIsSaving(false);
+        };
       };
       reader.readAsDataURL(file);
     }
@@ -30,7 +65,7 @@ const Settings: React.FC<Props> = ({ user, onUpdateUser, onNavigate, onSelectPla
     const success = await onUpdateUser(formData);
     setIsSaving(false);
     if (success) {
-      alert("Perfil atualizado com sucesso!");
+      onShowSuccess("Perfil atualizado com sucesso!");
     }
   };
 

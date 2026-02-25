@@ -6,9 +6,10 @@ interface Props {
   companies: Company[];
   onNavigate: (view: ViewState) => void;
   onNew: () => void;
+  onEdit: (company: Company) => void;
 }
 
-const CompanyList: React.FC<Props> = ({ companies, onNavigate, onNew }) => {
+const CompanyList: React.FC<Props> = ({ companies, onNavigate, onNew, onEdit }) => {
   return (
     <div className="pb-32 bg-gray-50 dark:bg-background-dark min-h-screen">
       <header className="sticky top-0 z-10 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 px-4 py-4">
@@ -58,7 +59,7 @@ const CompanyList: React.FC<Props> = ({ companies, onNavigate, onNew }) => {
                 </div>
               </div>
               <div className="flex space-x-1">
-                <button className="p-2 text-gray-400 hover:text-brand-cyan">
+                <button onClick={() => onEdit(company)} className="p-2 text-gray-400 hover:text-brand-cyan">
                   <span className="material-symbols-outlined text-xl">edit</span>
                 </button>
               </div>

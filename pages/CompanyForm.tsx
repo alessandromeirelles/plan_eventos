@@ -1,20 +1,21 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Company } from '../types';
 
 interface Props {
+  initialData?: Company;
   onSave: (company: Company) => void;
   onCancel: () => void;
 }
 
-const CompanyForm: React.FC<Props> = ({ onSave, onCancel }) => {
+const CompanyForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
-    name: '',
-    cnpj: '',
-    address: '',
-    contact: '',
-    icon: 'corporate_fare',
-    logo_url: ''
+    name: initialData?.name || '',
+    cnpj: initialData?.cnpj || '',
+    address: initialData?.address || '',
+    contact: initialData?.contact || '',
+    icon: initialData?.icon || 'corporate_fare',
+    logo_url: initialData?.logo_url || ''
   });
   const [isUploading, setIsUploading] = useState(false);
 
@@ -68,9 +69,8 @@ const CompanyForm: React.FC<Props> = ({ onSave, onCancel }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Passamos os dados sem o ID real, o App.tsx cuidará da inserção no banco
     onSave({
-      id: '', // Será ignorado pelo backend
+      id: initialData?.id || '',
       ...formData
     });
   };
@@ -157,15 +157,15 @@ const CompanyForm: React.FC<Props> = ({ onSave, onCancel }) => {
               />
             </div>
           </section>
-        </form>
 
-        <div className="absolute bottom-0 left-0 right-0 p-6 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex flex-col gap-3">
-          <button type="submit" form="company-form" className="w-full bg-brand-cyan hover:bg-cyan-600 text-white font-black py-4 rounded-xl shadow-lg shadow-brand-cyan/20 transition-all flex items-center justify-center gap-2">
-            <span className="material-symbols-outlined">add_business</span>
-            <span>Salvar Cliente</span>
-          </button>
-          <button type="button" onClick={onCancel} className="w-full py-2 text-slate-400 font-bold text-xs uppercase tracking-widest">Descartar</button>
-        </div>
+          <div className="absolute bottom-0 left-0 right-0 p-6 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex flex-col gap-3">
+            <button type="submit" className="w-full bg-brand-cyan hover:bg-cyan-600 text-white font-black py-4 rounded-xl shadow-lg shadow-brand-cyan/20 transition-all flex items-center justify-center gap-2">
+              <span className="material-symbols-outlined">add_business</span>
+              <span>Salvar Cliente</span>
+            </button>
+            <button type="button" onClick={onCancel} className="w-full py-2 text-slate-400 font-bold text-xs uppercase tracking-widest">Descartar</button>
+          </div>
+        </form>
       </div>
     </div>
   );
