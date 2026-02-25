@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ViewState, PlanEvent, Company, User } from './types';
 import { MOCK_EVENTS, MOCK_COMPANIES } from './constants';
-import { supabase } from './supabaseClient';
+import { supabase, getErrorMessage } from './supabaseClient';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
@@ -25,8 +25,21 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('monthly');
+  const [successPopup, setSuccessPopup] = useState<{show: boolean, message: string}>({show: false, message: ''});
+  const [errorPopup, setErrorPopup] = useState<{show: boolean, message: string}>({show: false, message: ''});
 
   useEffect(() => {
+    // Clear large cookies that might cause 413 errors in this environment
+    if (typeof document !== 'undefined') {
+      const cookies = document.cookie.split(";");
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i];
+        const eqPos = cookie.indexOf("=");
+        const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie;
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+      }
+    }
+
     // Check for session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -102,8 +115,14 @@ const App: React.FC = () => {
       if (eventsRes.data) setEvents(eventsRes.data);
       if (companiesRes.data) setCompanies(companiesRes.data);
     } catch (error: any) {
-      console.error("Erro ao carregar dados:", error);
-      setConnectionError(error.message || "Erro ao conectar com o banco de dados.");
+      console.error("Erro ao carregar dados [Detalhes]:", {
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+        fullError: error
+      });
+      setConnectionError(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -134,12 +153,12 @@ const App: React.FC = () => {
 
       if (error) throw error;
       
-      alert("Evento salvo com sucesso!");
       await fetchData();
       setCurrentView('EVENTS');
+      setSuccessPopup({show: true, message: 'Evento salvo com sucesso!'});
     } catch (error: any) {
       console.error("Erro ao salvar evento:", error);
-      alert(`Erro ao salvar evento: ${error.message}`);
+      setErrorPopup({show: true, message: `Erro ao salvar evento: ${getErrorMessage(error)}`});
     } finally {
       setLoading(false);
     }
@@ -160,12 +179,12 @@ const App: React.FC = () => {
 
       if (error) throw error;
       
-      alert("Cliente adicionado com sucesso!");
       await fetchData();
       setCurrentView('COMPANIES');
+      setSuccessPopup({show: true, message: 'Cliente adicionado com sucesso!'});
     } catch (error: any) {
       console.error("Erro ao adicionar cliente:", error);
-      alert(`Erro ao salvar cliente: ${error.message}`);
+      setErrorPopup({show: true, message: `Erro ao salvar cliente: ${getErrorMessage(error)}`});
     } finally {
       setLoading(false);
     }
@@ -248,12 +267,60 @@ const App: React.FC = () => {
           <div className="flex-1">
             <p className="text-xs font-black uppercase tracking-widest">Erro de Conexão</p>
             <p className="text-[10px] font-bold opacity-90 leading-tight">{connectionError}</p>
+            <button 
+              onClick={() => {
+                document.cookie.split(";").forEach(c => {
+                  document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+                });
+                window.location.reload();
+              }}
+              className="mt-1 text-[9px] underline font-bold opacity-80 hover:opacity-100"
+            >
+              Limpar Cookies e Recarregar
+            </button>
           </div>
           <button onClick={() => setConnectionError(null)} className="p-1 hover:bg-white/10 rounded-full">
             <span className="material-symbols-outlined text-sm">close</span>
           </button>
         </div>
       )}
+
+      {successPopup.show && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full flex flex-col items-center text-center shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500 rounded-full flex items-center justify-center mb-6">
+              <span className="material-symbols-outlined text-5xl">check_circle</span>
+            </div>
+            <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Sucesso!</h3>
+            <p className="text-slate-500 dark:text-slate-400 font-medium mb-8">{successPopup.message}</p>
+            <button 
+              onClick={() => setSuccessPopup({show: false, message: ''})}
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl transition-all active:scale-95"
+            >
+              OK, Continuar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {errorPopup.show && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full flex flex-col items-center text-center shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mb-6">
+              <span className="material-symbols-outlined text-5xl">error</span>
+            </div>
+            <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Ops!</h3>
+            <p className="text-slate-500 dark:text-slate-400 font-medium mb-8 text-sm">{errorPopup.message}</p>
+            <button 
+              onClick={() => setErrorPopup({show: false, message: ''})}
+              className="w-full bg-slate-800 dark:bg-slate-700 text-white font-black py-4 rounded-2xl transition-all active:scale-95"
+            >
+              Entendi
+            </button>
+          </div>
+        </div>
+      )}
+
       {renderView()}
       {showNavbar && (
         <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-full max-w-[430px] bg-white/90 dark:bg-background-dark/90 ios-blur border-t border-primary/10 px-6 pt-3 pb-8 flex justify-between items-center">

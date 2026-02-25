@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { PlanEvent, Company, ViewState, User } from '../types';
+import type { PlanEvent, Company, ViewState, User } from '../types';
 import Logo from '../components/Logo';
 
 interface Props {

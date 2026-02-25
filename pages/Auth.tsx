@@ -95,7 +95,6 @@ const Auth: React.FC<Props> = ({ onLogin, onCancel }) => {
         });
 
         if (authError) {
-          console.error("Erro de login:", authError);
           throw authError;
         }
 
@@ -131,7 +130,6 @@ const Auth: React.FC<Props> = ({ onLogin, onCancel }) => {
         });
 
         if (authError) {
-          console.error("Erro de cadastro:", authError);
           throw authError;
         }
         

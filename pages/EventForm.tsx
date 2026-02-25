@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
-import { Company, PlanEvent, EventStatus, InvoiceStatus } from '../types';
+import { EventStatus, InvoiceStatus } from '../types';
+import type { Company, PlanEvent } from '../types';
 
 interface Props {
   companies: Company[];
@@ -120,7 +121,7 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
           <div className="w-8"></div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 pb-48 no-scrollbar">
+        <form id="event-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 pb-48 no-scrollbar">
           <section className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Informações Gerais</h2>
             <div className="space-y-1.5">
@@ -257,7 +258,8 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
 
         <div className="absolute bottom-0 left-0 right-0 p-6 bg-white dark:bg-background-dark border-t border-gray-100 dark:border-gray-800 flex flex-col gap-3">
           <button 
-            onClick={handleSubmit}
+            type="submit"
+            form="event-form"
             className="w-full bg-brand-orange hover:bg-orange-600 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2"
           >
             <span className="material-symbols-outlined text-lg">check_circle</span>

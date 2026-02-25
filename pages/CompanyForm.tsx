@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Company } from '../types';
+import type { Company } from '../types';
 
 interface Props {
   onSave: (company: Company) => void;
@@ -21,11 +21,46 @@ const CompanyForm: React.FC<Props> = ({ onSave, onCancel }) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("A imagem é muito grande! Por favor, escolha uma imagem com menos de 5MB.");
+        return;
+      }
+
       setIsUploading(true);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData({ ...formData, logo_url: reader.result as string });
-        setIsUploading(false);
+        const img = new Image();
+        img.src = reader.result as string;
+        img.onload = () => {
+          // Redimensionar imagem para no máximo 200x200 mantendo proporção
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDimension = 200;
+
+          if (width > height) {
+            if (width > maxDimension) {
+              height *= maxDimension / width;
+              width = maxDimension;
+            }
+          } else {
+            if (height > maxDimension) {
+              width *= maxDimension / height;
+              height = maxDimension;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          // Comprimir para JPEG com qualidade 0.7
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          console.log('Imagem comprimida. Tamanho:', Math.round(compressedBase64.length / 1024), 'KB');
+          setFormData({ ...formData, logo_url: compressedBase64 });
+          setIsUploading(false);
+        };
       };
       reader.readAsDataURL(file);
     }
@@ -55,7 +90,7 @@ const CompanyForm: React.FC<Props> = ({ onSave, onCancel }) => {
           <div className="w-8"></div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 pb-48 no-scrollbar">
+        <form id="company-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 pb-48 no-scrollbar">
           <section className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Identidade Visual (Opcional)</h2>
             
@@ -77,27 +112,17 @@ const CompanyForm: React.FC<Props> = ({ onSave, onCancel }) => {
                   <span className="sr-only">Escolher arquivo</span>
                   <input type="file" accept="image/*" onChange={handleFileChange} className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-brand-cyan/10 file:text-brand-cyan hover:file:bg-brand-cyan/20 cursor-pointer"/>
                 </label>
-                <p className="text-[10px] text-slate-400 font-medium">Ou cole um link direto de imagem abaixo.</p>
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Nome da Empresa / Cliente</label>
+              <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Nome da Empresa / Cliente *</label>
               <input 
+                required
                 className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-4 text-sm focus:ring-2 focus:ring-brand-cyan outline-none dark:text-white" 
                 value={formData.name} 
                 onChange={e => setFormData({...formData, name: e.target.value})} 
                 placeholder="Ex: Studio Criativo LTDA ou Nome do Cliente" 
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">URL da Logomarca</label>
-              <input 
-                className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-4 text-sm focus:ring-2 focus:ring-brand-cyan outline-none dark:text-white" 
-                value={formData.logo_url} 
-                onChange={e => setFormData({...formData, logo_url: e.target.value})} 
-                placeholder="https://exemplo.com/foto.jpg" 
               />
             </div>
 
@@ -112,7 +137,7 @@ const CompanyForm: React.FC<Props> = ({ onSave, onCancel }) => {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">WhatsApp / Telefone</label>
+                <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">WhatsApp / Telefone (Opcional)</label>
                 <input 
                   className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-4 text-sm focus:ring-2 focus:ring-brand-cyan outline-none dark:text-white" 
                   value={formData.contact} 
@@ -135,7 +160,7 @@ const CompanyForm: React.FC<Props> = ({ onSave, onCancel }) => {
         </form>
 
         <div className="absolute bottom-0 left-0 right-0 p-6 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex flex-col gap-3">
-          <button onClick={handleSubmit} className="w-full bg-brand-cyan hover:bg-cyan-600 text-white font-black py-4 rounded-xl shadow-lg shadow-brand-cyan/20 transition-all flex items-center justify-center gap-2">
+          <button type="submit" form="company-form" className="w-full bg-brand-cyan hover:bg-cyan-600 text-white font-black py-4 rounded-xl shadow-lg shadow-brand-cyan/20 transition-all flex items-center justify-center gap-2">
             <span className="material-symbols-outlined">add_business</span>
             <span>Salvar Cliente</span>
           </button>

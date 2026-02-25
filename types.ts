@@ -37,7 +37,7 @@ export interface PlanEvent {
   user_id?: string;
 }
 
-export type ViewState = 'LANDING' | 'AUTH' | 'DASHBOARD' | 'EVENTS' | 'COMPANIES' | 'NEW_EVENT' | 'EDIT_EVENT' | 'NEW_COMPANY' | 'SETTINGS' | 'SUBSCRIPTION' | 'CHECKOUT';
+export type ViewState = 'LANDING' | 'AUTH' | 'DASHBOARD' | 'EVENTS' | 'COMPANIES' | 'NEW_EVENT' | 'EDIT_EVENT' | 'NEW_COMPANY' | 'EDIT_COMPANY' | 'SETTINGS' | 'SUBSCRIPTION' | 'CHECKOUT';
 
 export interface User {
   email: string;

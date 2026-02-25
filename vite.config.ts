@@ -8,10 +8,17 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        proxy: {
+          '/supabase-api': {
+            target: 'https://ycgptxnntkjodwqbnwwe.supabase.co',
+            changeOrigin: true,
+            rewrite: (path) => path.replace(/^\/supabase-api/, ''),
+            secure: false
+          }
+        }
       },
       plugins: [react()],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
       },
       resolve: {

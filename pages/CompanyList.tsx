@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Company, ViewState } from '../types';
+import type { Company, ViewState } from '../types';
 
 interface Props {
   companies: Company[];

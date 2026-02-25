@@ -8,7 +8,7 @@ declare const google: any;
 
 // Credenciais oficiais fornecidas pelo usuário
 const CLIENT_ID = '810529146566-3v71cbn992oil13l0vnnjci0kc7cojqj.apps.googleusercontent.com';
-const API_KEY = process.env.API_KEY; 
+const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || '';
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 
@@ -24,12 +24,19 @@ export const initGoogleScripts = (callback: (isInited: boolean) => void) => {
   const loadGapi = () => {
     if (typeof gapi === 'undefined') return;
     gapi.load('client', async () => {
-      await gapi.client.init({
-        apiKey: API_KEY,
-        discoveryDocs: [DISCOVERY_DOC],
-      });
-      gapiInited = true;
-      checkInit();
+      try {
+        const initConfig: any = {
+          discoveryDocs: [DISCOVERY_DOC],
+        };
+        if (API_KEY) {
+          initConfig.apiKey = API_KEY;
+        }
+        await gapi.client.init(initConfig);
+        gapiInited = true;
+        checkInit();
+      } catch (err) {
+        console.error("GAPI init error", err);
+      }
     });
   };
 

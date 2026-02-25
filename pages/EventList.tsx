@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
-import { PlanEvent, EventStatus, ViewState, InvoiceStatus } from '../types';
+import { EventStatus, InvoiceStatus } from '../types';
+import type { PlanEvent, ViewState } from '../types';
 
 interface Props {
   events: PlanEvent[];

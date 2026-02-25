@@ -79,18 +79,6 @@ const Settings: React.FC<Props> = ({ user, onUpdateUser, onNavigate, onSelectPla
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-black text-brand-navy dark:text-slate-400 ml-1 uppercase">URL da Foto</label>
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">link</span>
-                <input 
-                  className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl pl-12 pr-4 py-4 text-sm focus:ring-2 focus:ring-brand-orange dark:text-white outline-none"
-                  value={formData.photo}
-                  onChange={e => setFormData({...formData, photo: e.target.value})}
-                  placeholder="https://exemplo.com/foto.jpg"
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5">
               <label className="text-xs font-black text-brand-navy dark:text-slate-400 ml-1 uppercase">Biografia Curta</label>
               <textarea 
                 className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-4 text-sm focus:ring-2 focus:ring-brand-orange dark:text-white min-h-[100px] resize-none outline-none"
