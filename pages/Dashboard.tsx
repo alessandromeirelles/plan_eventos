@@ -14,6 +14,7 @@ interface Props {
 const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLeft, user }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [todayEvents, setTodayEvents] = useState<PlanEvent[]>([]);
+  const [showDailyAlert, setShowDailyAlert] = useState(false);
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -23,6 +24,9 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
     if (filtered.length > 0) {
       const lastNotified = localStorage.getItem('lastNotifiedDate');
       if (lastNotified !== today) {
+        // Show the custom modal alert
+        setShowDailyAlert(true);
+        
         const handleFirstInteraction = () => {
           try {
             const audio = new Audio('https://actions.google.com/sounds/v1/alarms/chime_bell_ding.ogg');
@@ -60,7 +64,19 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
     }
   };
 
-  const totalValue = events.reduce((acc, curr) => acc + curr.value, 0);
+  const now = new Date();
+  const currentMonthStr = (now.getMonth() + 1).toString().padStart(2, '0');
+  const currentYearStr = now.getFullYear().toString();
+  const monthPrefix = `${currentYearStr}-${currentMonthStr}`;
+
+  const pendingEventsThisMonth = events.filter(e => 
+    e.date.startsWith(monthPrefix) && 
+    e.status !== 'PAGO' && 
+    e.status !== 'CANCELADO'
+  );
+
+  const pendingJobsCount = pendingEventsThisMonth.length;
+  const pendingValue = pendingEventsThisMonth.reduce((acc, curr) => acc + curr.value, 0);
 
   const getCompanyLogo = (companyId: string) => {
     const company = companies.find(c => c.id === companyId);
@@ -79,6 +95,47 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
 
   return (
     <div className="pb-32 animate-in fade-in duration-700 relative">
+      {showDailyAlert && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-6 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-[40px] p-8 max-w-sm w-full flex flex-col items-center text-center shadow-2xl animate-in zoom-in-95 duration-300 border border-white/20">
+            <div className="size-24 bg-brand-orange/10 text-brand-orange rounded-full flex items-center justify-center mb-6 relative">
+              <span className="material-symbols-outlined text-6xl animate-bounce">notifications_active</span>
+              <div className="absolute -top-1 -right-1 size-8 bg-brand-orange text-white rounded-full flex items-center justify-center text-sm font-black border-4 border-white dark:border-slate-900">
+                {todayEvents.length}
+              </div>
+            </div>
+            <h3 className="text-2xl font-black text-brand-navy dark:text-white mb-2 uppercase tracking-tight">Eventos de Hoje!</h3>
+            <p className="text-slate-500 dark:text-slate-400 font-medium mb-8">
+              Você tem <span className="text-brand-orange font-black">{todayEvents.length}</span> compromisso(s) agendado(s) para hoje.
+            </p>
+            
+            <div className="w-full space-y-3 mb-8 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+              {todayEvents.map(e => (
+                <div key={e.id} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 text-left">
+                  <p className="text-sm font-black text-brand-navy dark:text-white truncate">{e.title}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-xs">location_on</span>
+                    {e.location || 'Local a definir'}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <button 
+              onClick={() => {
+                setShowDailyAlert(false);
+                if ('Notification' in window && Notification.permission === 'default') {
+                  requestNotificationPermission();
+                }
+              }}
+              className="w-full bg-brand-navy dark:bg-white dark:text-brand-navy text-white font-black py-5 rounded-2xl transition-all active:scale-95 shadow-xl shadow-brand-navy/20"
+            >
+              ENTENDI, VAMOS LÁ!
+            </button>
+          </div>
+        </div>
+      )}
+
       <header className="sticky top-0 z-50 bg-white dark:bg-background-dark/95 ios-blur px-4 h-16 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 shadow-sm">
         <div className="w-10"></div> 
         <div className="flex items-center justify-center relative">
@@ -138,16 +195,26 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
             
             <div className="flex flex-wrap items-center gap-2 mb-6">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-navy text-white shadow-lg">
-                <span className="material-symbols-outlined text-sm text-brand-orange animate-pulse">lock_clock</span>
-                <span className="text-[10px] font-black uppercase tracking-widest">{trialDaysLeft} dias de licença</span>
+                <span className="material-symbols-outlined text-sm text-brand-orange animate-pulse">
+                  {user?.subscription_status === 'active' ? 'verified' : user?.subscription_status === 'expired' ? 'error' : 'lock_clock'}
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                  {user?.subscription_status === 'active' 
+                    ? `${trialDaysLeft} dias para renovação` 
+                    : user?.subscription_status === 'expired'
+                      ? 'Assinatura Expirada'
+                      : `${trialDaysLeft} dias de licença`}
+                </span>
               </div>
-              <button 
-                onClick={() => onNavigate('CHECKOUT')}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-orange text-white shadow-lg active:scale-95 transition-all"
-              >
-                <span className="material-symbols-outlined text-sm">workspace_premium</span>
-                <span className="text-[10px] font-black uppercase tracking-widest">Assinar Agora</span>
-              </button>
+              {user?.subscription_status !== 'active' && (
+                <button 
+                  onClick={() => onNavigate('CHECKOUT')}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-orange text-white shadow-lg active:scale-95 transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">workspace_premium</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Assinar Agora</span>
+                </button>
+              )}
             </div>
           </div>
           <div className="flex flex-col items-center gap-2 shrink-0">
@@ -159,12 +226,12 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
 
         <div className="grid grid-cols-2 gap-4 mb-10">
           <div className="flex flex-col gap-4 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 shadow-sm">
-            <span className="text-3xl font-black text-brand-navy dark:text-white">{events.length}</span>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Jobs Ativos</p>
+            <span className="text-3xl font-black text-brand-navy dark:text-white">{pendingJobsCount}</span>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Jobs Pendentes</p>
           </div>
           <div className="flex flex-col gap-4 rounded-3xl border border-orange-50 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 shadow-sm">
-            <span className="text-2xl font-black text-brand-orange">R$ {(totalValue / 1000).toFixed(1)}k</span>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Previsão</p>
+            <span className="text-2xl font-black text-brand-orange">R$ {pendingValue.toLocaleString('pt-BR')}</span>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Previsão (Mês)</p>
           </div>
         </div>
 

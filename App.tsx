@@ -13,6 +13,7 @@ import EventForm from './pages/EventForm';
 import CompanyForm from './pages/CompanyForm';
 import Checkout from './pages/Checkout';
 import Settings from './pages/Settings';
+import AdminDashboard from './pages/AdminDashboard';
 
 const DEFAULT_EVENT_TYPES = ['Workshop', 'Casamento', 'Corporativo', 'Aniversário', 'Jantar'];
 
@@ -44,6 +45,27 @@ const App: React.FC = () => {
             // Ensure we have the latest photo/name from auth if missing in firestore
             userData.photo = userData.photo || firebaseUser.photoURL || '';
             userData.name = userData.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuário';
+
+            // Validate subscription/trial expiry
+            const now = new Date();
+            let isExpired = false;
+
+            if (userData.subscription_status === 'active' && userData.subscription_expiry_date) {
+              if (new Date(userData.subscription_expiry_date) < now) {
+                isExpired = true;
+              }
+            } else if (userData.subscription_status === 'trial' && userData.trial_start_date) {
+              const trialEnd = new Date(userData.trial_start_date);
+              trialEnd.setDate(trialEnd.getDate() + 30);
+              if (trialEnd < now) {
+                isExpired = true;
+              }
+            }
+
+            if (isExpired) {
+              userData.subscription_status = 'expired';
+              await setDoc(userDocRef, userData);
+            }
           } else {
             userData = {
               email: firebaseUser.email || '',
@@ -60,7 +82,14 @@ const App: React.FC = () => {
           }
           
           setUser(userData);
-          setCurrentView('DASHBOARD');
+          if (userData.event_types && userData.event_types.length > 0) {
+            setEventTypes(userData.event_types);
+          }
+          if (userData.email === 'admin@admin.com.br') {
+            setCurrentView('ADMIN_DASHBOARD');
+          } else {
+            setCurrentView('DASHBOARD');
+          }
         } catch (error) {
           console.error("Error fetching user data:", error);
           // Fallback if firestore fails
@@ -115,8 +144,24 @@ const App: React.FC = () => {
     }
   };
 
-  const getTrialDaysLeft = () => {
-    return 30;
+  const getDaysLeft = () => {
+    if (!user) return 0;
+    
+    const now = new Date();
+    let targetDate: Date;
+
+    if (user.subscription_status === 'active' && user.subscription_expiry_date) {
+      targetDate = new Date(user.subscription_expiry_date);
+    } else if (user.trial_start_date) {
+      targetDate = new Date(user.trial_start_date);
+      targetDate.setDate(targetDate.getDate() + 30);
+    } else {
+      return 0;
+    }
+
+    const diffTime = targetDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
   };
 
   const handleSaveEvent = async (event: PlanEvent) => {
@@ -237,7 +282,11 @@ const App: React.FC = () => {
 
   const handleLogin = (u: User) => {
     setUser(u);
-    setCurrentView('DASHBOARD');
+    if (u.email === 'admin@admin.com.br') {
+      setCurrentView('ADMIN_DASHBOARD');
+    } else {
+      setCurrentView('DASHBOARD');
+    }
   };
 
   const handleLogout = async () => {
@@ -250,17 +299,59 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateEventTypes = async (newTypes: string[]) => {
+    setEventTypes(newTypes);
+    if (user && auth.currentUser) {
+      try {
+        const userDocRef = doc(db, 'users', auth.currentUser.uid);
+        await setDoc(userDocRef, { ...user, event_types: newTypes });
+        setUser({ ...user, event_types: newTypes });
+      } catch (error) {
+        console.error("Error saving event types:", error);
+      }
+    }
+  };
+
+  const handleSubscriptionSuccess = async (planType: 'monthly' | 'yearly') => {
+    if (!user || !auth.currentUser) return;
+
+    const now = new Date();
+    const expiryDate = new Date();
+    if (planType === 'monthly') {
+      expiryDate.setMonth(now.getMonth() + 1);
+    } else {
+      expiryDate.setFullYear(now.getFullYear() + 1);
+    }
+
+    const updatedUser: User = {
+      ...user,
+      subscription_status: 'active',
+      plan_type: planType,
+      subscription_expiry_date: expiryDate.toISOString()
+    };
+
+    try {
+      const userDocRef = doc(db, 'users', auth.currentUser.uid);
+      await setDoc(userDocRef, updatedUser);
+      setUser(updatedUser);
+      setCurrentView('DASHBOARD');
+      setSuccessPopup({show: true, message: `Assinatura ${planType === 'monthly' ? 'Mensal' : 'Anual'} ativada com sucesso!`});
+    } catch (error: any) {
+      setErrorPopup({show: true, message: `Erro ao ativar assinatura: ${error.message}`});
+    }
+  };
+
   const renderView = () => {
     if (!user && currentView !== 'LANDING' && currentView !== 'AUTH') return <Landing onNavigate={setCurrentView} />;
     
     switch (currentView) {
       case 'LANDING': return <Landing onNavigate={setCurrentView} />;
       case 'AUTH': return <Auth onLogin={handleLogin} onCancel={() => setCurrentView('LANDING')} />;
-      case 'DASHBOARD': return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getTrialDaysLeft()} user={user} />;
+      case 'DASHBOARD': return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getDaysLeft()} user={user} />;
       case 'EVENTS': return <EventList events={events} onDelete={handleDeleteEvent} onEdit={(e) => { setEditingEvent(e); setCurrentView('EDIT_EVENT'); }} onNavigate={setCurrentView} onNew={() => { setEditingEvent(null); setCurrentView('NEW_EVENT'); }} />;
-      case 'COMPANIES': return <CompanyList companies={companies} onNavigate={setCurrentView} onNew={() => { setEditingCompany(null); setCurrentView('NEW_COMPANY'); }} onEdit={(c) => { setEditingCompany(c); setCurrentView('EDIT_COMPANY'); }} />;
+      case 'COMPANIES': return <CompanyList companies={companies} events={events} onNavigate={setCurrentView} onNew={() => { setEditingCompany(null); setCurrentView('NEW_COMPANY'); }} onEdit={(c) => { setEditingCompany(c); setCurrentView('EDIT_COMPANY'); }} />;
       case 'NEW_EVENT':
-      case 'EDIT_EVENT': return <EventForm companies={companies} eventTypes={eventTypes} onUpdateEventTypes={setEventTypes} initialData={editingEvent || undefined} onSave={handleSaveEvent} onCancel={() => { setEditingEvent(null); setCurrentView('EVENTS'); }} onNewCompany={() => setCurrentView('NEW_COMPANY')} />;
+      case 'EDIT_EVENT': return <EventForm companies={companies} eventTypes={eventTypes} onUpdateEventTypes={handleUpdateEventTypes} initialData={editingEvent || undefined} onSave={handleSaveEvent} onCancel={() => { setEditingEvent(null); setCurrentView('EVENTS'); }} onNewCompany={() => setCurrentView('NEW_COMPANY')} />;
       case 'NEW_COMPANY':
       case 'EDIT_COMPANY': return <CompanyForm initialData={editingCompany || undefined} onSave={handleAddCompany} onCancel={() => { setEditingCompany(null); setCurrentView('COMPANIES'); }} />;
       case 'SETTINGS':
@@ -274,12 +365,13 @@ const App: React.FC = () => {
             onShowSuccess={(message) => setSuccessPopup({show: true, message})}
           />
         ) : null;
-      case 'CHECKOUT': return <Checkout plan={selectedPlan} onSuccess={() => setCurrentView('DASHBOARD')} onCancel={() => setCurrentView('LANDING')} />;
-      default: return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getTrialDaysLeft()} user={user} />;
+      case 'CHECKOUT': return <Checkout plan={selectedPlan} userId={auth.currentUser?.uid || ''} onSuccess={handleSubscriptionSuccess} onCancel={() => setCurrentView('DASHBOARD')} />;
+      case 'ADMIN_DASHBOARD': return <AdminDashboard onLogout={handleLogout} />;
+      default: return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getDaysLeft()} user={user} />;
     }
   };
 
-  const showNavbar = user && !['LANDING', 'AUTH', 'CHECKOUT', 'NEW_EVENT', 'EDIT_EVENT', 'NEW_COMPANY', 'EDIT_COMPANY'].includes(currentView);
+  const showNavbar = user && !['LANDING', 'AUTH', 'CHECKOUT', 'NEW_EVENT', 'EDIT_EVENT', 'NEW_COMPANY', 'EDIT_COMPANY', 'ADMIN_DASHBOARD'].includes(currentView);
 
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark max-w-[430px] mx-auto relative shadow-2xl overflow-x-hidden border-x border-primary/10">

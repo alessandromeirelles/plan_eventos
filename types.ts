@@ -37,7 +37,7 @@ export interface PlanEvent {
   user_id?: string;
 }
 
-export type ViewState = 'LANDING' | 'AUTH' | 'DASHBOARD' | 'EVENTS' | 'COMPANIES' | 'NEW_EVENT' | 'EDIT_EVENT' | 'NEW_COMPANY' | 'EDIT_COMPANY' | 'SETTINGS' | 'SUBSCRIPTION' | 'CHECKOUT';
+export type ViewState = 'LANDING' | 'AUTH' | 'DASHBOARD' | 'EVENTS' | 'COMPANIES' | 'NEW_EVENT' | 'EDIT_EVENT' | 'NEW_COMPANY' | 'EDIT_COMPANY' | 'SETTINGS' | 'SUBSCRIPTION' | 'CHECKOUT' | 'ADMIN_DASHBOARD';
 
 export interface User {
   email: string;
@@ -45,8 +45,11 @@ export interface User {
   photo?: string;
   trial_start_date?: string;
   subscription_status?: 'trial' | 'active' | 'expired';
+  subscription_expiry_date?: string;
   plan_type?: 'none' | 'monthly' | 'yearly';
   bio?: string;
   company_name?: string;
   cnpj?: string;
+  status?: 'active' | 'suspended' | 'deleted';
+  event_types?: string[];
 }

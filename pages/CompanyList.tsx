@@ -1,15 +1,24 @@
 
 import React from 'react';
-import type { Company, ViewState } from '../types';
+import type { Company, ViewState, PlanEvent } from '../types';
 
 interface Props {
   companies: Company[];
+  events: PlanEvent[];
   onNavigate: (view: ViewState) => void;
   onNew: () => void;
   onEdit: (company: Company) => void;
 }
 
-const CompanyList: React.FC<Props> = ({ companies, onNavigate, onNew, onEdit }) => {
+const CompanyList: React.FC<Props> = ({ companies, events, onNavigate, onNew, onEdit }) => {
+  const today = new Date().toISOString().split('T')[0];
+
+  const getEventCounts = (companyId: string) => {
+    const companyEvents = events.filter(e => e.company_id === companyId);
+    const realized = companyEvents.filter(e => e.date < today).length;
+    const upcoming = companyEvents.filter(e => e.date >= today).length;
+    return { realized, upcoming };
+  };
   return (
     <div className="pb-32 bg-gray-50 dark:bg-background-dark min-h-screen">
       <header className="sticky top-0 z-10 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 px-4 py-4">
@@ -65,6 +74,16 @@ const CompanyList: React.FC<Props> = ({ companies, onNavigate, onNew, onEdit }) 
               </div>
             </div>
             <div className="space-y-3 border-t border-gray-50 dark:border-gray-800 pt-4">
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Realizados</p>
+                  <p className="text-xl font-black text-brand-navy dark:text-white">{getEventCounts(company.id).realized}</p>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">A Realizar</p>
+                  <p className="text-xl font-black text-brand-orange">{getEventCounts(company.id).upcoming}</p>
+                </div>
+              </div>
               <div className="flex items-start space-x-3">
                 <span className="material-symbols-outlined text-gray-400 text-lg">location_on</span>
                 <p className="text-sm text-gray-600 dark:text-gray-400">{company.address}</p>

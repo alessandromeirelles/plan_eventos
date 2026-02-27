@@ -163,37 +163,56 @@ const Settings: React.FC<Props> = ({ user, onUpdateUser, onNavigate, onSelectPla
             <div className="flex items-center justify-between mb-6">
               <div>
                 <p className="text-xs font-black text-brand-navy dark:text-white uppercase">Status do Plano</p>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Período de Teste (30 dias)</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  {user.subscription_status === 'active' 
+                    ? `Expira em ${new Date(user.subscription_expiry_date || '').toLocaleDateString('pt-BR')}`
+                    : 'Período de Teste (30 dias)'}
+                </p>
               </div>
-              <span className="px-3 py-1 bg-amber-100 text-amber-600 rounded-full text-[10px] font-black uppercase">Trial</span>
+              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                user.subscription_status === 'active' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
+              }`}>
+                {user.subscription_status === 'active' ? 'Ativo' : 'Trial'}
+              </span>
             </div>
             
-            <div className="space-y-3">
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-black text-brand-navy dark:text-white">Mensal Profissional</p>
-                  <p className="text-[10px] font-bold text-slate-400">R$ 9,90 / mês</p>
+            {user.subscription_status !== 'active' && (
+              <div className="space-y-3">
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-black text-brand-navy dark:text-white">Mensal Profissional</p>
+                    <p className="text-[10px] font-bold text-slate-400">R$ 9,90 / mês</p>
+                  </div>
+                  <button 
+                    onClick={() => { onSelectPlan('monthly'); onNavigate('CHECKOUT'); }}
+                    className="bg-brand-orange text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase"
+                  >
+                    Assinar
+                  </button>
                 </div>
-                <button 
-                  onClick={() => { onSelectPlan('monthly'); onNavigate('CHECKOUT'); }}
-                  className="bg-brand-orange text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase"
-                >
-                  Assinar
-                </button>
-              </div>
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-black text-brand-navy dark:text-white">Anual Premium</p>
-                  <p className="text-[10px] font-bold text-slate-400">R$ 99,90 / ano</p>
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-black text-brand-navy dark:text-white">Anual Premium</p>
+                    <p className="text-[10px] font-bold text-slate-400">R$ 99,90 / ano</p>
+                  </div>
+                  <button 
+                    onClick={() => { onSelectPlan('yearly'); onNavigate('CHECKOUT'); }}
+                    className="bg-brand-orange text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase"
+                  >
+                    Assinar
+                  </button>
                 </div>
-                <button 
-                  onClick={() => { onSelectPlan('yearly'); onNavigate('CHECKOUT'); }}
-                  className="bg-brand-orange text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase"
-                >
-                  Assinar
-                </button>
               </div>
-            </div>
+            )}
+            
+            {user.subscription_status === 'active' && (
+              <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 flex items-center gap-3">
+                <span className="material-symbols-outlined text-emerald-500">verified</span>
+                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                  Sua assinatura {user.plan_type === 'monthly' ? 'Mensal' : 'Anual'} está ativa e protegida.
+                </p>
+              </div>
+            )}
           </div>
         </section>
 

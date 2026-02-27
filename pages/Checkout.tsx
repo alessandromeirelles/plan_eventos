@@ -3,25 +3,45 @@ import React, { useState } from 'react';
 
 interface Props {
   plan: 'monthly' | 'yearly';
+  userId: string;
   onSuccess: (planType: 'monthly' | 'yearly') => void;
   onCancel: () => void;
 }
 
-const Checkout: React.FC<Props> = ({ plan, onSuccess, onCancel }) => {
+const Checkout: React.FC<Props> = ({ plan, userId, onSuccess, onCancel }) => {
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>(plan);
-  const [method, setMethod] = useState<'CARD' | 'PIX'>('CARD');
   const [isProcessing, setIsProcessing] = useState(false);
   
   const price = selectedPlan === 'monthly' ? '9,90' : '99,90';
   const period = selectedPlan === 'monthly' ? 'mês' : 'ano';
 
+  // Links de Pagamento do PagSeguro
+  const PAGSEGURO_LINK_MONTHLY = "https://pag.ae/81xB3HtTJ";
+  const PAGSEGURO_LINK_YEARLY = "https://pag.ae/81xB47ZTN";
+
   const handlePayment = () => {
     setIsProcessing(true);
-    // Simula processamento de 2 segundos
-    setTimeout(() => {
-      setIsProcessing(false);
-      onSuccess(selectedPlan);
-    }, 2500);
+    
+    // Redireciona para o PagSeguro com a referência do usuário
+    const baseUrl = selectedPlan === 'monthly' ? PAGSEGURO_LINK_MONTHLY : PAGSEGURO_LINK_YEARLY;
+    const paymentLink = `${baseUrl}?reference=${userId}`;
+    
+    // Abre o PagSeguro em uma janela popup (menor) para não sair do aplicativo
+    const width = 500;
+    const height = 700;
+    const left = (window.innerWidth - width) / 2;
+    const top = (window.innerHeight - height) / 2;
+    
+    const popup = window.open(
+      paymentLink, 
+      'PagSeguro', 
+      `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,status=yes,resizable=yes`
+    );
+    
+    // Se o bloqueador de popups impedir, abre em nova aba
+    if (!popup) {
+      window.open(paymentLink, '_blank');
+    }
   };
 
   if (isProcessing) {
@@ -31,11 +51,24 @@ const Checkout: React.FC<Props> = ({ plan, onSuccess, onCancel }) => {
           <div className="absolute inset-0 border-4 border-primary/20 rounded-full"></div>
           <div className="absolute inset-0 border-4 border-t-brand-cyan rounded-full animate-spin"></div>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="material-symbols-outlined text-brand-cyan text-4xl">shield_lock</span>
+            <span className="material-symbols-outlined text-brand-cyan text-4xl">hourglass_empty</span>
           </div>
         </div>
-        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2 text-center">Processando Pagamento</h2>
-        <p className="text-slate-500 text-center text-sm font-medium px-8">Estamos validando seus dados em um ambiente 100% criptografado.</p>
+        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2 text-center">Aguardando Pagamento...</h2>
+        <p className="text-slate-500 text-center text-sm font-medium px-8 mb-6">
+          Assim que o PagSeguro confirmar seu pagamento, seu plano será ativado automaticamente. Isso pode levar alguns minutos.
+        </p>
+        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 mb-8">
+          <p className="text-[10px] font-black text-slate-400 uppercase text-center">ID de Referência</p>
+          <p className="text-xs font-mono text-slate-600 dark:text-slate-300 text-center">{userId}</p>
+        </div>
+        <button 
+          onClick={onCancel}
+          className="bg-slate-900 dark:bg-white dark:text-slate-900 text-white font-black px-8 py-4 rounded-2xl shadow-xl active:scale-95 transition-all"
+        >
+          Voltar para o Dashboard
+        </button>
+        <p className="mt-6 text-[10px] text-slate-400 text-center uppercase font-black">Você pode fechar esta tela. O plano será ativado em segundo plano.</p>
       </div>
     );
   }
@@ -87,73 +120,16 @@ const Checkout: React.FC<Props> = ({ plan, onSuccess, onCancel }) => {
           </div>
         </div>
 
-        {/* Seleção de Método */}
-        <div className="flex gap-4 mb-8">
-          <button 
-            onClick={() => setMethod('CARD')}
-            className={`flex-1 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${method === 'CARD' ? 'border-brand-cyan bg-brand-cyan/5' : 'border-slate-100 dark:border-slate-800'}`}
-          >
-            <span className="material-symbols-outlined">credit_card</span>
-            <span className="text-xs font-black uppercase">Cartão</span>
-          </button>
-          <button 
-            onClick={() => setMethod('PIX')}
-            className={`flex-1 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${method === 'PIX' ? 'border-brand-cyan bg-brand-cyan/5' : 'border-slate-100 dark:border-slate-800'}`}
-          >
-            <span className="material-symbols-outlined">pix</span>
-            <span className="text-xs font-black uppercase">PIX</span>
-          </button>
+        {/* Informação PagSeguro */}
+        <div className="bg-brand-cyan/5 border border-brand-cyan/20 rounded-3xl p-6 text-center">
+          <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+            <span className="material-symbols-outlined text-brand-cyan text-3xl">lock</span>
+          </div>
+          <h3 className="text-sm font-black text-slate-800 dark:text-white mb-2">Pagamento via PagSeguro</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+            Você será redirecionado para o ambiente seguro do PagSeguro para finalizar sua compra com Cartão de Crédito, PIX ou Boleto.
+          </p>
         </div>
-
-        {method === 'CARD' ? (
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-400 uppercase ml-1">Número do Cartão</label>
-              <div className="relative">
-                <input className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-4 text-sm focus:ring-2 focus:ring-brand-cyan dark:text-white" placeholder="0000 0000 0000 0000" />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-1">
-                  <div className="w-8 h-5 bg-slate-200 rounded"></div>
-                  <div className="w-8 h-5 bg-slate-300 rounded"></div>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-400 uppercase ml-1">Validade</label>
-                <input className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-4 text-sm focus:ring-2 focus:ring-brand-cyan dark:text-white" placeholder="MM/AA" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-400 uppercase ml-1">CVV</label>
-                <input className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-4 text-sm focus:ring-2 focus:ring-brand-cyan dark:text-white" placeholder="123" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-400 uppercase ml-1">Nome no Cartão</label>
-              <input className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-4 text-sm focus:ring-2 focus:ring-brand-cyan dark:text-white uppercase" placeholder="JOÃO D SILVA" />
-            </div>
-          </div>
-        ) : (
-          <div className="text-center space-y-6">
-             <div className="bg-slate-100 dark:bg-slate-800 size-48 mx-auto rounded-3xl flex items-center justify-center p-4">
-                {/* QR Code Simulado */}
-                <div className="w-full h-full bg-slate-200 dark:bg-slate-700 rounded-xl relative overflow-hidden flex flex-wrap p-2">
-                   {[...Array(64)].map((_, i) => (
-                     <div key={i} className={`size-4 ${Math.random() > 0.5 ? 'bg-slate-900 dark:bg-white' : ''}`}></div>
-                   ))}
-                   <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="bg-white p-2 rounded-lg shadow-xl">
-                        <span className="material-symbols-outlined text-brand-cyan">pix</span>
-                      </div>
-                   </div>
-                </div>
-             </div>
-             <p className="text-xs text-slate-500 font-medium px-10">Escaneie o QR Code acima no app do seu banco para pagar instantaneamente.</p>
-             <button className="flex items-center gap-2 mx-auto text-brand-cyan font-black text-xs uppercase tracking-widest border border-brand-cyan/20 px-4 py-2 rounded-full">
-               <span className="material-symbols-outlined text-sm">content_copy</span>
-               Copiar Código PIX
-             </button>
-          </div>
-        )}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-white dark:bg-background-dark border-t border-slate-100 dark:border-slate-800">
@@ -161,8 +137,8 @@ const Checkout: React.FC<Props> = ({ plan, onSuccess, onCancel }) => {
           onClick={handlePayment}
           className="w-full bg-slate-900 dark:bg-white dark:text-slate-900 text-white font-black py-5 rounded-2xl shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all"
         >
-          <span className="material-symbols-outlined">lock</span>
-          <span>Pagar Agora R$ {price}</span>
+          <span className="material-symbols-outlined">shopping_cart_checkout</span>
+          <span>Pagar R$ {price} no PagSeguro</span>
         </button>
       </div>
     </div>

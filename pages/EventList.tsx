@@ -152,7 +152,6 @@ const EventList: React.FC<Props> = ({ events, onDelete, onEdit, onNavigate, onNe
             <div key={event.id} className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md">
               <div className="flex justify-between items-start mb-2">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-primary uppercase tracking-tighter">#{event.id}</span>
                   <h3 className="font-bold text-slate-800 dark:text-white">{event.title}</h3>
                 </div>
                 <div className="flex flex-col items-end gap-1">
