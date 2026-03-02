@@ -1,19 +1,24 @@
 
 import React, { useState } from 'react';
 import { User, ViewState } from '../types';
+import { maskCpfCnpj } from '../utils';
 
 interface Props {
   user: User;
   onUpdateUser: (updatedUser: User) => Promise<boolean>;
+  onChangePassword?: (newPassword: string) => Promise<boolean>;
   onNavigate: (view: ViewState) => void;
   onSelectPlan: (plan: 'monthly' | 'yearly') => void;
   onLogout: () => void;
   onShowSuccess: (message: string) => void;
 }
 
-const Settings: React.FC<Props> = ({ user, onUpdateUser, onNavigate, onSelectPlan, onLogout, onShowSuccess }) => {
+const Settings: React.FC<Props> = ({ user, onUpdateUser, onChangePassword, onNavigate, onSelectPlan, onLogout, onShowSuccess }) => {
   const [formData, setFormData] = useState<User>({ ...user });
   const [isSaving, setIsSaving] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -62,10 +67,37 @@ const Settings: React.FC<Props> = ({ user, onUpdateUser, onNavigate, onSelectPla
 
   const handleSave = async () => {
     setIsSaving(true);
+    setPasswordError('');
+    
+    let passwordChanged = false;
+    if (newPassword) {
+      if (newPassword !== confirmPassword) {
+        setPasswordError('As senhas não coincidem.');
+        setIsSaving(false);
+        return;
+      }
+      if (newPassword.length < 6) {
+        setPasswordError('A senha deve ter pelo menos 6 caracteres.');
+        setIsSaving(false);
+        return;
+      }
+      if (onChangePassword) {
+        const success = await onChangePassword(newPassword);
+        if (success) {
+          passwordChanged = true;
+          setNewPassword('');
+          setConfirmPassword('');
+        } else {
+          setIsSaving(false);
+          return; // Stop if password change failed
+        }
+      }
+    }
+
     const success = await onUpdateUser(formData);
     setIsSaving(false);
     if (success) {
-      onShowSuccess("Perfil atualizado com sucesso!");
+      onShowSuccess(passwordChanged ? "Perfil e senha atualizados com sucesso!" : "Perfil atualizado com sucesso!");
     }
   };
 
@@ -148,11 +180,50 @@ const Settings: React.FC<Props> = ({ user, onUpdateUser, onNavigate, onSelectPla
                 <input 
                   className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl pl-12 pr-4 py-4 text-sm focus:ring-2 focus:ring-brand-orange dark:text-white outline-none"
                   value={formData.cnpj}
-                  onChange={e => setFormData({...formData, cnpj: e.target.value})}
+                  onChange={e => setFormData({...formData, cnpj: maskCpfCnpj(e.target.value)})}
                   placeholder="00.000.000/0001-00"
+                  maxLength={18}
                 />
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Segurança */}
+        <section className="space-y-4">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Segurança</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] p-6 shadow-sm border border-slate-100 dark:border-slate-800 space-y-5">
+            <div className="space-y-1.5">
+              <label className="text-xs font-black text-brand-navy dark:text-slate-400 ml-1 uppercase">Nova Senha</label>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">lock</span>
+                <input 
+                  type="password"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl pl-12 pr-4 py-4 text-sm focus:ring-2 focus:ring-brand-orange dark:text-white outline-none"
+                  value={newPassword}
+                  onChange={e => { setNewPassword(e.target.value); setPasswordError(''); }}
+                  placeholder="Deixe em branco para não alterar"
+                />
+              </div>
+            </div>
+            {newPassword && (
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="text-xs font-black text-brand-navy dark:text-slate-400 ml-1 uppercase">Confirmar Nova Senha</label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">lock_reset</span>
+                  <input 
+                    type="password"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl pl-12 pr-4 py-4 text-sm focus:ring-2 focus:ring-brand-orange dark:text-white outline-none"
+                    value={confirmPassword}
+                    onChange={e => { setConfirmPassword(e.target.value); setPasswordError(''); }}
+                    placeholder="Repita a nova senha"
+                  />
+                </div>
+              </div>
+            )}
+            {passwordError && (
+              <p className="text-xs font-bold text-red-500 ml-1 animate-in fade-in">{passwordError}</p>
+            )}
           </div>
         </section>
 

@@ -18,6 +18,7 @@ export interface Company {
   cnpj: string;
   address: string;
   contact: string;
+  responsible?: string;
   icon: string;
   logo_url?: string;
   user_id?: string;
@@ -35,6 +36,10 @@ export interface PlanEvent {
   invoice_status?: InvoiceStatus;
   invoice_number?: string;
   user_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  paid_at?: string;
+  invoice_issued_at?: string;
 }
 
 export type ViewState = 'LANDING' | 'AUTH' | 'DASHBOARD' | 'EVENTS' | 'COMPANIES' | 'NEW_EVENT' | 'EDIT_EVENT' | 'NEW_COMPANY' | 'EDIT_COMPANY' | 'SETTINGS' | 'SUBSCRIPTION' | 'CHECKOUT' | 'ADMIN_DASHBOARD';

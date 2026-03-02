@@ -26,7 +26,7 @@ const Logo: React.FC<LogoProps> = ({ className = "h-10 w-auto", size = 'md' }) =
 
   return (
     <img 
-      src="https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/planeventos-logo.png" 
+      src="https://storage.googleapis.com/a1aa/image/q4zB851V_d9xXqIuWJ4qI_Z_e_Q-gV5f2kZqT404r4w.jpg" 
       alt="PlanEventos" 
       className={className}
       onError={() => setError(true)}

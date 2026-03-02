@@ -2,16 +2,19 @@
 import React from 'react';
 import type { Company, ViewState, PlanEvent } from '../types';
 
+import { getTodayString } from '../utils';
+
 interface Props {
   companies: Company[];
   events: PlanEvent[];
   onNavigate: (view: ViewState) => void;
   onNew: () => void;
   onEdit: (company: Company) => void;
+  onDelete: (id: string) => void;
 }
 
-const CompanyList: React.FC<Props> = ({ companies, events, onNavigate, onNew, onEdit }) => {
-  const today = new Date().toISOString().split('T')[0];
+const CompanyList: React.FC<Props> = ({ companies, events, onNavigate, onNew, onEdit, onDelete }) => {
+  const today = getTodayString();
 
   const getEventCounts = (companyId: string) => {
     const companyEvents = events.filter(e => e.company_id === companyId);
@@ -47,9 +50,9 @@ const CompanyList: React.FC<Props> = ({ companies, events, onNavigate, onNew, on
         </div>
       </div>
 
-      <main className="px-4 space-y-4">
+      <main className="px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {companies.map(company => (
-          <div key={company.id} className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800">
+          <div key={company.id} className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col">
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 overflow-hidden border border-slate-200 dark:border-slate-700">
@@ -68,12 +71,15 @@ const CompanyList: React.FC<Props> = ({ companies, events, onNavigate, onNew, on
                 </div>
               </div>
               <div className="flex space-x-1">
-                <button onClick={() => onEdit(company)} className="p-2 text-gray-400 hover:text-brand-cyan">
+                <button onClick={() => onEdit(company)} className="p-2 text-gray-400 hover:text-brand-cyan transition-colors">
                   <span className="material-symbols-outlined text-xl">edit</span>
+                </button>
+                <button onClick={() => onDelete(company.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                  <span className="material-symbols-outlined text-xl">delete</span>
                 </button>
               </div>
             </div>
-            <div className="space-y-3 border-t border-gray-50 dark:border-gray-800 pt-4">
+            <div className="space-y-3 border-t border-gray-50 dark:border-gray-800 pt-4 flex-1 flex flex-col">
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Realizados</p>
@@ -85,18 +91,23 @@ const CompanyList: React.FC<Props> = ({ companies, events, onNavigate, onNew, on
                 </div>
               </div>
               <div className="flex items-start space-x-3">
-                <span className="material-symbols-outlined text-gray-400 text-lg">location_on</span>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{company.address}</p>
+                <span className="material-symbols-outlined text-gray-400 text-lg">badge</span>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{company.responsible || 'Responsável não informado'}</p>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mt-auto pt-3">
                 <div className="flex items-center space-x-3">
                   <span className="material-symbols-outlined text-gray-400 text-lg">person</span>
                   <p className="text-sm text-gray-600 dark:text-gray-400">{company.contact}</p>
                 </div>
-                <button className="flex items-center space-x-1 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg text-xs font-bold transition-all active:scale-95">
+                <a 
+                  href={company.contact ? `https://wa.me/${company.contact.replace(/\D/g, '').startsWith('55') ? company.contact.replace(/\D/g, '') : '55' + company.contact.replace(/\D/g, '')}` : '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 ${company.contact ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed pointer-events-none'}`}
+                >
                   <span className="material-symbols-outlined text-sm">chat</span>
                   <span>WhatsApp</span>
-                </button>
+                </a>
               </div>
             </div>
           </div>

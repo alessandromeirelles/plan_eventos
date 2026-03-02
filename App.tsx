@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { ViewState, PlanEvent, Company, User } from './types';
+import { ViewState, PlanEvent, Company, User, EventStatus, InvoiceStatus } from './types';
 import { auth, db } from './firebaseConfig';
-import { collection, doc, getDocs, setDoc, deleteDoc, query, where, getDoc } from 'firebase/firestore';
-import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth';
+import { collection, doc, getDocs, setDoc, deleteDoc, query, where, getDoc, updateDoc } from 'firebase/firestore';
+import { onAuthStateChanged, signOut, updateProfile, updatePassword } from 'firebase/auth';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
@@ -14,6 +14,7 @@ import CompanyForm from './pages/CompanyForm';
 import Checkout from './pages/Checkout';
 import Settings from './pages/Settings';
 import AdminDashboard from './pages/AdminDashboard';
+import Logo from './components/Logo';
 
 const DEFAULT_EVENT_TYPES = ['Workshop', 'Casamento', 'Corporativo', 'Aniversário', 'Jantar'];
 
@@ -172,9 +173,32 @@ const App: React.FC = () => {
         return;
       }
 
-      const isNew = event.id.startsWith('EV-');
+      const isNew = !events.some(e => e.id === event.id);
       const eventId = isNew ? `EV-${Date.now()}` : event.id;
-      const eventData = { ...event, id: eventId, user_id: user.email };
+      const now = new Date().toISOString();
+      
+      const eventData = { 
+        ...event, 
+        id: eventId, 
+        user_id: user.email,
+        updated_at: now
+      };
+
+      if (isNew) {
+        eventData.created_at = now;
+      } else {
+        const existingEvent = events.find(e => e.id === event.id);
+        if (existingEvent?.created_at) {
+          eventData.created_at = existingEvent.created_at;
+        }
+      }
+
+      if (eventData.status === EventStatus.PAID && (!event.paid_at || isNew)) {
+        eventData.paid_at = now;
+      }
+      if (eventData.invoice_status === InvoiceStatus.ISSUED && (!event.invoice_issued_at || isNew)) {
+        eventData.invoice_issued_at = now;
+      }
       
       await setDoc(doc(db, 'events', eventId), eventData);
       
@@ -258,6 +282,80 @@ const App: React.FC = () => {
     }
   };
 
+  const handleChangePassword = async (newPassword: string) => {
+    setLoading(true);
+    try {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await updatePassword(currentUser, newPassword);
+        setSuccessPopup({show: true, message: 'Senha alterada com sucesso!'});
+        return true;
+      }
+      return false;
+    } catch (error: any) {
+      if (error.code === 'auth/requires-recent-login') {
+        setErrorPopup({show: true, message: 'Por motivos de segurança, você precisa sair e fazer login novamente para alterar a senha.'});
+      } else {
+        setErrorPopup({show: true, message: `Erro ao alterar senha: ${error.message || error}`});
+      }
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEventStatusChange = async (id: string, newStatus: EventStatus) => {
+    try {
+      setLoading(true);
+      const eventRef = doc(db, 'events', id);
+      const now = new Date().toISOString();
+      const updateData: any = { status: newStatus, updated_at: now };
+      
+      if (newStatus === EventStatus.PAID) {
+        updateData.paid_at = now;
+      }
+      
+      await updateDoc(eventRef, updateData);
+      
+      const updatedEvents = events.map(e => 
+        e.id === id ? { ...e, ...updateData } : e
+      );
+      setEvents(updatedEvents);
+      setSuccessPopup({show: true, message: 'Status do evento atualizado com sucesso!'});
+    } catch (error: any) {
+      setErrorPopup({show: true, message: `Erro ao atualizar status: ${error.message || error}`});
+      console.error("Erro ao atualizar status:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInvoiceStatusChange = async (id: string, newStatus: InvoiceStatus) => {
+    try {
+      setLoading(true);
+      const eventRef = doc(db, 'events', id);
+      const now = new Date().toISOString();
+      const updateData: any = { invoice_status: newStatus, updated_at: now };
+      
+      if (newStatus === InvoiceStatus.ISSUED) {
+        updateData.invoice_issued_at = now;
+      }
+      
+      await updateDoc(eventRef, updateData);
+      
+      const updatedEvents = events.map(e => 
+        e.id === id ? { ...e, ...updateData } : e
+      );
+      setEvents(updatedEvents);
+      setSuccessPopup({show: true, message: 'Status da NF atualizado com sucesso!'});
+    } catch (error: any) {
+      setErrorPopup({show: true, message: `Erro ao atualizar status da NF: ${error.message || error}`});
+      console.error("Erro ao atualizar status da NF:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteEvent = async (id: string) => {
     setConfirmPopup({
       show: true,
@@ -272,6 +370,28 @@ const App: React.FC = () => {
           setSuccessPopup({show: true, message: 'Evento excluído com sucesso!'});
         } catch (error: any) {
           setErrorPopup({show: true, message: `Erro ao excluir evento: ${error.message || error}`});
+          console.error("Erro ao excluir:", error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
+  };
+
+  const handleDeleteCompany = async (id: string) => {
+    setConfirmPopup({
+      show: true,
+      message: "Tem certeza que deseja excluir este cliente? Isso não excluirá os eventos associados a ele.",
+      onConfirm: async () => {
+        setConfirmPopup({show: false, message: '', onConfirm: () => {}});
+        setLoading(true);
+        try {
+          await deleteDoc(doc(db, 'companies', id));
+          const updatedCompanies = companies.filter(c => c.id !== id);
+          setCompanies(updatedCompanies);
+          setSuccessPopup({show: true, message: 'Cliente excluído com sucesso!'});
+        } catch (error: any) {
+          setErrorPopup({show: true, message: `Erro ao excluir cliente: ${error.message || error}`});
           console.error("Erro ao excluir:", error);
         } finally {
           setLoading(false);
@@ -348,8 +468,8 @@ const App: React.FC = () => {
       case 'LANDING': return <Landing onNavigate={setCurrentView} />;
       case 'AUTH': return <Auth onLogin={handleLogin} onCancel={() => setCurrentView('LANDING')} />;
       case 'DASHBOARD': return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getDaysLeft()} user={user} />;
-      case 'EVENTS': return <EventList events={events} onDelete={handleDeleteEvent} onEdit={(e) => { setEditingEvent(e); setCurrentView('EDIT_EVENT'); }} onNavigate={setCurrentView} onNew={() => { setEditingEvent(null); setCurrentView('NEW_EVENT'); }} />;
-      case 'COMPANIES': return <CompanyList companies={companies} events={events} onNavigate={setCurrentView} onNew={() => { setEditingCompany(null); setCurrentView('NEW_COMPANY'); }} onEdit={(c) => { setEditingCompany(c); setCurrentView('EDIT_COMPANY'); }} />;
+      case 'EVENTS': return <EventList events={events} companies={companies} eventTypes={eventTypes} onDelete={handleDeleteEvent} onStatusChange={handleEventStatusChange} onInvoiceStatusChange={handleInvoiceStatusChange} onEdit={(e) => { setEditingEvent(e); setCurrentView('EDIT_EVENT'); }} onNavigate={setCurrentView} onNew={() => { setEditingEvent(null); setCurrentView('NEW_EVENT'); }} />;
+      case 'COMPANIES': return <CompanyList companies={companies} events={events} onDelete={handleDeleteCompany} onNavigate={setCurrentView} onNew={() => { setEditingCompany(null); setCurrentView('NEW_COMPANY'); }} onEdit={(c) => { setEditingCompany(c); setCurrentView('EDIT_COMPANY'); }} />;
       case 'NEW_EVENT':
       case 'EDIT_EVENT': return <EventForm companies={companies} eventTypes={eventTypes} onUpdateEventTypes={handleUpdateEventTypes} initialData={editingEvent || undefined} onSave={handleSaveEvent} onCancel={() => { setEditingEvent(null); setCurrentView('EVENTS'); }} onNewCompany={() => setCurrentView('NEW_COMPANY')} />;
       case 'NEW_COMPANY':
@@ -359,6 +479,7 @@ const App: React.FC = () => {
           <Settings 
             user={user} 
             onUpdateUser={handleUpdateUser} 
+            onChangePassword={handleChangePassword}
             onNavigate={setCurrentView}
             onSelectPlan={setSelectedPlan}
             onLogout={handleLogout} 
@@ -374,7 +495,7 @@ const App: React.FC = () => {
   const showNavbar = user && !['LANDING', 'AUTH', 'CHECKOUT', 'NEW_EVENT', 'EDIT_EVENT', 'NEW_COMPANY', 'EDIT_COMPANY', 'ADMIN_DASHBOARD'].includes(currentView);
 
   return (
-    <div className="min-h-screen bg-background-light dark:bg-background-dark max-w-[430px] mx-auto relative shadow-2xl overflow-x-hidden border-x border-primary/10">
+    <div className={`min-h-screen bg-background-light dark:bg-background-dark relative overflow-x-hidden max-w-[430px] md:max-w-none mx-auto shadow-2xl md:shadow-none border-x border-primary/10 md:border-none ${showNavbar ? 'md:pl-64' : ''}`}>
       {connectionError && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-[380px] bg-red-600 text-white p-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top duration-300">
           <span className="material-symbols-outlined">cloud_off</span>
@@ -462,25 +583,70 @@ const App: React.FC = () => {
       )}
 
       {renderView()}
+      
+      <footer className="w-full text-center py-6 text-xs text-slate-400 dark:text-slate-500 font-medium pb-28 md:pb-6 flex flex-col gap-1">
+        <span>Desenvolvido por Motiva & Comunica - 2026</span>
+        <span className="text-[10px] opacity-70">v1.2.1</span>
+      </footer>
+
       {showNavbar && (
-        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-full max-w-[430px] bg-white/90 dark:bg-background-dark/90 ios-blur border-t border-primary/10 px-6 pt-3 pb-8 flex justify-between items-center">
-          <button onClick={() => setCurrentView('DASHBOARD')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'DASHBOARD' ? 'text-primary' : 'text-slate-400'}`}>
-            <span className="material-symbols-outlined text-[28px]">dashboard</span>
-            <span className="text-[10px] font-bold">Início</span>
-          </button>
-          <button onClick={() => setCurrentView('COMPANIES')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'COMPANIES' ? 'text-primary' : 'text-slate-400'}`}>
-            <span className="material-symbols-outlined text-[28px]">corporate_fare</span>
-            <span className="text-[10px] font-bold">Clientes</span>
-          </button>
-          <button onClick={() => setCurrentView('EVENTS')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'EVENTS' ? 'text-primary' : 'text-slate-400'}`}>
-            <span className="material-symbols-outlined text-[28px]">calendar_month</span>
-            <span className="text-[10px] font-bold">Eventos</span>
-          </button>
-          <button onClick={() => setCurrentView('SETTINGS')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'SETTINGS' ? 'text-primary' : 'text-slate-400'}`}>
-            <span className="material-symbols-outlined text-[28px]">settings</span>
-            <span className="text-[10px] font-bold">Perfil</span>
-          </button>
-        </nav>
+        <>
+          {/* Mobile Bottom Nav */}
+          <nav className="md:hidden fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-full max-w-[430px] bg-white/90 dark:bg-background-dark/90 ios-blur border-t border-primary/10 px-6 pt-3 pb-8 flex justify-between items-center">
+            <button onClick={() => setCurrentView('DASHBOARD')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'DASHBOARD' ? 'text-primary' : 'text-slate-400'}`}>
+              <span className="material-symbols-outlined text-[28px]">dashboard</span>
+              <span className="text-[10px] font-bold">Início</span>
+            </button>
+            <button onClick={() => setCurrentView('COMPANIES')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'COMPANIES' ? 'text-primary' : 'text-slate-400'}`}>
+              <span className="material-symbols-outlined text-[28px]">corporate_fare</span>
+              <span className="text-[10px] font-bold">Clientes</span>
+            </button>
+            <button onClick={() => setCurrentView('EVENTS')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'EVENTS' ? 'text-primary' : 'text-slate-400'}`}>
+              <span className="material-symbols-outlined text-[28px]">calendar_month</span>
+              <span className="text-[10px] font-bold">Eventos</span>
+            </button>
+            <button onClick={() => setCurrentView('SETTINGS')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'SETTINGS' ? 'text-primary' : 'text-slate-400'}`}>
+              <span className="material-symbols-outlined text-[28px]">settings</span>
+              <span className="text-[10px] font-bold">Perfil</span>
+            </button>
+          </nav>
+
+          {/* Desktop Sidebar */}
+          <nav className="hidden md:flex flex-col fixed top-0 left-0 h-screen w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-40 p-6 shadow-xl">
+            <div className="flex items-center gap-3 mb-12">
+              <Logo className="h-12 w-auto" />
+            </div>
+            
+            <div className="flex flex-col gap-2 flex-1">
+              <button onClick={() => setCurrentView('DASHBOARD')} className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${currentView === 'DASHBOARD' ? 'bg-primary/10 text-primary font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'}`}>
+                <span className="material-symbols-outlined">dashboard</span>
+                <span>Início</span>
+              </button>
+              <button onClick={() => setCurrentView('COMPANIES')} className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${currentView === 'COMPANIES' ? 'bg-primary/10 text-primary font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'}`}>
+                <span className="material-symbols-outlined">corporate_fare</span>
+                <span>Clientes</span>
+              </button>
+              <button onClick={() => setCurrentView('EVENTS')} className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${currentView === 'EVENTS' ? 'bg-primary/10 text-primary font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'}`}>
+                <span className="material-symbols-outlined">calendar_month</span>
+                <span>Eventos</span>
+              </button>
+              <button onClick={() => setCurrentView('SETTINGS')} className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${currentView === 'SETTINGS' ? 'bg-primary/10 text-primary font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'}`}>
+                <span className="material-symbols-outlined">settings</span>
+                <span>Perfil</span>
+              </button>
+            </div>
+            
+            {user && (
+              <div className="mt-auto pt-6 border-t border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                <img src={user.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=F47920&color=fff`} alt="Profile" className="w-10 h-10 rounded-full object-cover border-2 border-slate-200 dark:border-slate-700" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 dark:text-white truncate">{user.name}</p>
+                  <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                </div>
+              </div>
+            )}
+          </nav>
+        </>
       )}
     </div>
   );

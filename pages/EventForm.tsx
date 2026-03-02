@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { EventStatus, InvoiceStatus } from '../types';
 import type { Company, PlanEvent } from '../types';
+import { getTodayString } from '../utils';
 
 interface Props {
   companies: Company[];
@@ -20,7 +21,7 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
   const [formData, setFormData] = useState({
     id: initialData?.id || 'EV-' + Math.floor(1000 + Math.random() * 9000),
     title: initialData?.title || '',
-    date: initialData?.date || new Date().toISOString().split('T')[0],
+    date: initialData?.date || getTodayString(),
     type: initialData?.type || (eventTypes[0] || ''),
     company_id: initialData?.company_id || (companies[0]?.id || ''),
     status: initialData?.status || EventStatus.PENDING,

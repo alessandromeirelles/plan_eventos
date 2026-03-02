@@ -1,7 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
+import { EventStatus, InvoiceStatus } from '../types';
 import type { PlanEvent, Company, ViewState, User } from '../types';
 import Logo from '../components/Logo';
+
+import { getTodayString } from '../utils';
 
 interface Props {
   events: PlanEvent[];
@@ -11,13 +14,21 @@ interface Props {
   user?: User | null;
 }
 
+interface HistoryItem {
+  id: string;
+  eventId: string;
+  type: 'CREATED' | 'PAID' | 'INVOICE_ISSUED';
+  date: string;
+  event: PlanEvent;
+}
+
 const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLeft, user }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [todayEvents, setTodayEvents] = useState<PlanEvent[]>([]);
   const [showDailyAlert, setShowDailyAlert] = useState(false);
 
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayString();
     const filtered = events.filter(e => e.date === today);
     setTodayEvents(filtered);
 
@@ -69,14 +80,12 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
   const currentYearStr = now.getFullYear().toString();
   const monthPrefix = `${currentYearStr}-${currentMonthStr}`;
 
-  const pendingEventsThisMonth = events.filter(e => 
-    e.date.startsWith(monthPrefix) && 
-    e.status !== 'PAGO' && 
-    e.status !== 'CANCELADO'
+  const eventsThisMonth = events.filter(e => 
+    e.date.startsWith(monthPrefix)
   );
 
-  const pendingJobsCount = pendingEventsThisMonth.length;
-  const pendingValue = pendingEventsThisMonth.reduce((acc, curr) => acc + curr.value, 0);
+  const totalEventsCount = eventsThisMonth.length;
+  const totalValueThisMonth = eventsThisMonth.reduce((acc, curr) => acc + curr.value, 0);
 
   const getCompanyLogo = (companyId: string) => {
     const company = companies.find(c => c.id === companyId);
@@ -88,10 +97,74 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
     return company?.icon || 'corporate_fare';
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayString();
   const upcomingEvents = events
     .filter(e => e.date >= todayStr)
     .sort((a, b) => a.date.localeCompare(b.date));
+
+  const historyItems: HistoryItem[] = [];
+  events.forEach(event => {
+    if (event.created_at) {
+      historyItems.push({
+        id: `${event.id}-created`,
+        eventId: event.id,
+        type: 'CREATED',
+        date: event.created_at,
+        event
+      });
+    } else {
+      const match = event.id.match(/EV-(\d+)/);
+      if (match) {
+        const timestamp = parseInt(match[1]);
+        if (!isNaN(timestamp)) {
+          historyItems.push({
+            id: `${event.id}-created`,
+            eventId: event.id,
+            type: 'CREATED',
+            date: new Date(timestamp).toISOString(),
+            event
+          });
+        }
+      }
+    }
+
+    if (event.paid_at) {
+      historyItems.push({
+        id: `${event.id}-paid`,
+        eventId: event.id,
+        type: 'PAID',
+        date: event.paid_at,
+        event
+      });
+    }
+
+    if (event.invoice_issued_at) {
+      historyItems.push({
+        id: `${event.id}-invoice`,
+        eventId: event.id,
+        type: 'INVOICE_ISSUED',
+        date: event.invoice_issued_at,
+        event
+      });
+    }
+  });
+
+  historyItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const recentHistory = historyItems.slice(0, 5);
+
+  const formatTimeAgo = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 60) return `${diffMins}m atrás`;
+    if (diffHours < 24) return `${diffHours}h atrás`;
+    if (diffDays === 1) return 'Ontem';
+    return `${diffDays}d atrás`;
+  };
 
   return (
     <div className="pb-32 animate-in fade-in duration-700 relative">
@@ -225,13 +298,25 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-10">
-          <div className="flex flex-col gap-4 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 shadow-sm">
-            <span className="text-3xl font-black text-brand-navy dark:text-white">{pendingJobsCount}</span>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Jobs Pendentes</p>
+          <div className="flex flex-col gap-4 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 shadow-sm relative overflow-hidden">
+            <div className="absolute right-4 top-4 text-slate-100 dark:text-slate-800/50">
+              <span className="material-symbols-outlined text-5xl">calendar_month</span>
+            </div>
+            <div className="relative z-10 flex flex-col">
+              <span className="text-3xl font-black text-brand-navy dark:text-white">{totalEventsCount}</span>
+              <span className="text-[10px] font-bold text-slate-400">Neste mês</span>
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest relative z-10">Eventos Total</p>
           </div>
-          <div className="flex flex-col gap-4 rounded-3xl border border-orange-50 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 shadow-sm">
-            <span className="text-2xl font-black text-brand-orange">R$ {pendingValue.toLocaleString('pt-BR')}</span>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Previsão (Mês)</p>
+          <div className="flex flex-col gap-4 rounded-3xl border border-orange-50 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 shadow-sm relative overflow-hidden">
+            <div className="absolute right-4 top-4 text-orange-50 dark:text-slate-800/50">
+              <span className="material-symbols-outlined text-5xl">payments</span>
+            </div>
+            <div className="relative z-10 flex flex-col">
+              <span className="text-2xl font-black text-brand-orange">R$ {totalValueThisMonth.toLocaleString('pt-BR')}</span>
+              <span className="text-[10px] font-bold text-slate-400">Neste mês</span>
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest relative z-10">Total (Mês)</p>
           </div>
         </div>
 
@@ -268,6 +353,61 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
               <p className="text-xs font-bold uppercase tracking-widest">Nenhum evento futuro</p>
             </div>
           )}
+        </div>
+
+        <div className="space-y-4 mt-10">
+          <div className="flex justify-between items-center px-1">
+            <h2 className="text-xl font-extrabold text-brand-navy dark:text-white tracking-tight">Histórico Recente</h2>
+          </div>
+          
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+            {recentHistory.map((item, index) => {
+              const isLast = index === recentHistory.length - 1;
+              let icon = '';
+              let iconColor = '';
+              let title = '';
+              let subtitle = '';
+
+              if (item.type === 'CREATED') {
+                icon = 'add_circle';
+                iconColor = 'text-blue-500 bg-blue-50 dark:bg-blue-500/10';
+                title = 'Novo Evento';
+                subtitle = item.event.title;
+              } else if (item.type === 'PAID') {
+                icon = 'check_circle';
+                iconColor = 'text-green-500 bg-green-50 dark:bg-green-500/10';
+                title = 'Pagamento Recebido';
+                subtitle = item.event.title;
+              } else if (item.type === 'INVOICE_ISSUED') {
+                icon = 'receipt_long';
+                iconColor = 'text-brand-orange bg-brand-orange/10';
+                title = 'NF Emitida';
+                subtitle = item.event.title;
+              }
+
+              return (
+                <div key={item.id} className={`flex items-center gap-4 p-4 ${!isLast ? 'border-b border-slate-50 dark:border-slate-800' : ''}`}>
+                  <div className={`size-10 rounded-full flex items-center justify-center shrink-0 ${iconColor}`}>
+                    <span className="material-symbols-outlined text-lg">{icon}</span>
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">{title}</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{subtitle}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{formatTimeAgo(item.date)}</span>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {recentHistory.length === 0 && (
+              <div className="text-center py-8 opacity-50">
+                <span className="material-symbols-outlined text-4xl mb-2">history</span>
+                <p className="text-xs font-bold uppercase tracking-widest">Nenhum histórico recente</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

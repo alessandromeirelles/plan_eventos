@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Company } from '../types';
+import { maskCpfCnpj, maskPhone } from '../utils';
 
 interface Props {
   initialData?: Company;
@@ -14,6 +15,7 @@ const CompanyForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
     cnpj: initialData?.cnpj || '',
     address: initialData?.address || '',
     contact: initialData?.contact || '',
+    responsible: initialData?.responsible || '',
     icon: initialData?.icon || 'corporate_fare',
     logo_url: initialData?.logo_url || ''
   });
@@ -126,14 +128,25 @@ const CompanyForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
               />
             </div>
 
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Responsável (Opcional)</label>
+              <input 
+                className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-4 text-sm focus:ring-2 focus:ring-brand-cyan outline-none dark:text-white" 
+                value={formData.responsible} 
+                onChange={e => setFormData({...formData, responsible: e.target.value})} 
+                placeholder="Nome da pessoa responsável" 
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">CNPJ / CPF</label>
                 <input 
                   className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-4 text-sm focus:ring-2 focus:ring-brand-cyan outline-none dark:text-white" 
                   value={formData.cnpj} 
-                  onChange={e => setFormData({...formData, cnpj: e.target.value})} 
+                  onChange={e => setFormData({...formData, cnpj: maskCpfCnpj(e.target.value)})} 
                   placeholder="00.000.000/0001-00" 
+                  maxLength={18}
                 />
               </div>
               <div className="space-y-1.5">
@@ -141,8 +154,9 @@ const CompanyForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
                 <input 
                   className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-4 text-sm focus:ring-2 focus:ring-brand-cyan outline-none dark:text-white" 
                   value={formData.contact} 
-                  onChange={e => setFormData({...formData, contact: e.target.value})} 
+                  onChange={e => setFormData({...formData, contact: maskPhone(e.target.value)})} 
                   placeholder="(00) 00000-0000" 
+                  maxLength={15}
                 />
               </div>
             </div>
