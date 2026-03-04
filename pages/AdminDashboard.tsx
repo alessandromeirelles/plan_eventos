@@ -5,9 +5,10 @@ import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 
 interface Props {
   onLogout: () => void;
+  onNavigate: (view: any) => void;
 }
 
-const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
+const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -51,9 +52,18 @@ const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-background-dark p-6 animate-in fade-in duration-500">
       <header className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-2xl font-black text-brand-navy dark:text-white uppercase tracking-tight">Painel Admin</h1>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Gerenciamento de Usuários</p>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => onNavigate('DASHBOARD')}
+            className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"
+            title="Voltar ao App"
+          >
+            <span className="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div>
+            <h1 className="text-2xl font-black text-brand-navy dark:text-white uppercase tracking-tight">Painel Admin</h1>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Gerenciamento de Usuários</p>
+          </div>
         </div>
         <button 
           onClick={onLogout}

@@ -43,23 +43,31 @@ const App: React.FC = () => {
           let userData: User;
           if (userDocSnap.exists()) {
             userData = userDocSnap.data() as User;
+            userData.uid = firebaseUser.uid;
             // Ensure we have the latest photo/name from auth if missing in firestore
             userData.photo = userData.photo || firebaseUser.photoURL || '';
             userData.name = userData.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuário';
+
+            // Check if user is admin
+            if (userData.email === 'admin@admin.com.br' || userData.email.startsWith('alessandromeirelles')) {
+              userData.role = 'admin';
+            }
 
             // Validate subscription/trial expiry
             const now = new Date();
             let isExpired = false;
 
-            if (userData.subscription_status === 'active' && userData.subscription_expiry_date) {
-              if (new Date(userData.subscription_expiry_date) < now) {
-                isExpired = true;
-              }
-            } else if (userData.subscription_status === 'trial' && userData.trial_start_date) {
-              const trialEnd = new Date(userData.trial_start_date);
-              trialEnd.setDate(trialEnd.getDate() + 30);
-              if (trialEnd < now) {
-                isExpired = true;
+            if (userData.role !== 'admin') {
+              if (userData.subscription_status === 'active' && userData.subscription_expiry_date) {
+                if (new Date(userData.subscription_expiry_date) < now) {
+                  isExpired = true;
+                }
+              } else if (userData.subscription_status === 'trial' && userData.trial_start_date) {
+                const trialEnd = new Date(userData.trial_start_date);
+                trialEnd.setDate(trialEnd.getDate() + 30);
+                if (trialEnd < now) {
+                  isExpired = true;
+                }
               }
             }
 
@@ -69,6 +77,7 @@ const App: React.FC = () => {
             }
           } else {
             userData = {
+              uid: firebaseUser.uid,
               email: firebaseUser.email || '',
               name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuário',
               photo: firebaseUser.photoURL || '',
@@ -78,6 +87,11 @@ const App: React.FC = () => {
               subscription_status: 'trial',
               trial_start_date: firebaseUser.metadata.creationTime || new Date().toISOString()
             };
+            
+            if (userData.email === 'admin@admin.com.br' || userData.email.startsWith('alessandromeirelles')) {
+              userData.role = 'admin';
+            }
+
             // Save initial data to Firestore
             await setDoc(userDocRef, userData);
           }
@@ -86,11 +100,7 @@ const App: React.FC = () => {
           if (userData.event_types && userData.event_types.length > 0) {
             setEventTypes(userData.event_types);
           }
-          if (userData.email === 'admin@admin.com.br') {
-            setCurrentView('ADMIN_DASHBOARD');
-          } else {
-            setCurrentView('DASHBOARD');
-          }
+          setCurrentView('DASHBOARD');
         } catch (error) {
           console.error("Error fetching user data:", error);
           // Fallback if firestore fails
@@ -121,6 +131,21 @@ const App: React.FC = () => {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (user && companies.length > 0) {
+      const companiesWithoutColor = companies.filter(c => !c.color);
+      if (companiesWithoutColor.length > 0) {
+        const colors = ['#fee2e2', '#ffedd5', '#fef3c7', '#dcfce7', '#e0f2fe', '#ede9fe', '#fce7f3', '#f3f4f6'];
+        companiesWithoutColor.forEach(async (c) => {
+          const randomColor = colors[Math.floor(Math.random() * colors.length)];
+          const companyRef = doc(db, 'companies', c.id);
+          await updateDoc(companyRef, { color: randomColor });
+          setCompanies(prev => prev.map(comp => comp.id === c.id ? { ...comp, color: randomColor } : comp));
+        });
+      }
+    }
+  }, [user, companies]);
+
   const fetchData = async () => {
     if (!user) return;
     setLoading(true);
@@ -147,6 +172,7 @@ const App: React.FC = () => {
 
   const getDaysLeft = () => {
     if (!user) return 0;
+    if (user.role === 'admin') return 9999;
     
     const now = new Date();
     let targetDate: Date;
@@ -202,6 +228,25 @@ const App: React.FC = () => {
       
       await setDoc(doc(db, 'events', eventId), eventData);
       
+      if (user.google_calendar_connected) {
+        try {
+          const syncRes = await fetch('/api/calendar/event', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.uid, event: eventData })
+          });
+          if (syncRes.ok) {
+            const syncData = await syncRes.json();
+            if (syncData.googleEventId && !eventData.google_calendar_event_id) {
+              eventData.google_calendar_event_id = syncData.googleEventId;
+              await setDoc(doc(db, 'events', eventId), eventData);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to sync with Google Calendar", err);
+        }
+      }
+
       let updatedEvents;
       if (isNew) {
         updatedEvents = [...events, eventData];
@@ -230,11 +275,26 @@ const App: React.FC = () => {
 
       const isNew = !newCompany.id || newCompany.id === '';
       const companyId = isNew ? `CO-${Date.now()}` : newCompany.id;
+      
+      let color = newCompany.color;
+      if (!color) {
+        const colors = ['#fee2e2', '#ffedd5', '#fef3c7', '#dcfce7', '#e0f2fe', '#ede9fe', '#fce7f3', '#f3f4f6'];
+        color = colors[Math.floor(Math.random() * colors.length)];
+      }
+
       const companyData = { 
         ...newCompany, 
         id: companyId,
-        user_id: user.email 
+        user_id: user.email,
+        color
       };
+
+      // Remove undefined fields to avoid Firestore errors
+      Object.keys(companyData).forEach(key => {
+        if ((companyData as any)[key] === undefined) {
+          delete (companyData as any)[key];
+        }
+      });
 
       await setDoc(doc(db, 'companies', companyId), companyData);
 
@@ -249,8 +309,8 @@ const App: React.FC = () => {
       setCurrentView('COMPANIES');
       setSuccessPopup({show: true, message: 'Cliente salvo com sucesso!'});
     } catch (error: any) {
-      setErrorPopup({show: true, message: `Erro ao salvar cliente: ${error.message || error}`});
-      console.error(error);
+      console.error("Erro detalhado ao salvar cliente:", error);
+      setErrorPopup({show: true, message: `Erro ao salvar cliente: ${error.message || JSON.stringify(error)}`});
     } finally {
       setLoading(false);
     }
@@ -364,9 +424,23 @@ const App: React.FC = () => {
         setConfirmPopup({show: false, message: '', onConfirm: () => {}});
         setLoading(true);
         try {
+          const eventToDelete = events.find(e => e.id === id);
           await deleteDoc(doc(db, 'events', id));
           const updatedEvents = events.filter(e => e.id !== id);
           setEvents(updatedEvents);
+          
+          if (user?.google_calendar_connected && eventToDelete?.google_calendar_event_id) {
+            try {
+              await fetch('/api/calendar/event', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.uid, googleEventId: eventToDelete.google_calendar_event_id })
+              });
+            } catch (err) {
+              console.error("Failed to delete from Google Calendar", err);
+            }
+          }
+
           setSuccessPopup({show: true, message: 'Evento excluído com sucesso!'});
         } catch (error: any) {
           setErrorPopup({show: true, message: `Erro ao excluir evento: ${error.message || error}`});
@@ -401,12 +475,11 @@ const App: React.FC = () => {
   };
 
   const handleLogin = (u: User) => {
-    setUser(u);
-    if (u.email === 'admin@admin.com.br') {
-      setCurrentView('ADMIN_DASHBOARD');
-    } else {
-      setCurrentView('DASHBOARD');
+    if (u.email === 'admin@admin.com.br' || u.email.startsWith('alessandromeirelles')) {
+      u.role = 'admin';
     }
+    setUser(u);
+    setCurrentView('DASHBOARD');
   };
 
   const handleLogout = async () => {
@@ -487,7 +560,7 @@ const App: React.FC = () => {
           />
         ) : null;
       case 'CHECKOUT': return <Checkout plan={selectedPlan} userId={auth.currentUser?.uid || ''} onSuccess={handleSubscriptionSuccess} onCancel={() => setCurrentView('DASHBOARD')} />;
-      case 'ADMIN_DASHBOARD': return <AdminDashboard onLogout={handleLogout} />;
+      case 'ADMIN_DASHBOARD': return <AdminDashboard onLogout={handleLogout} onNavigate={setCurrentView} />;
       default: return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getDaysLeft()} user={user} />;
     }
   };
@@ -609,6 +682,12 @@ const App: React.FC = () => {
               <span className="material-symbols-outlined text-[28px]">settings</span>
               <span className="text-[10px] font-bold">Perfil</span>
             </button>
+            {user?.role === 'admin' && (
+              <button onClick={() => setCurrentView('ADMIN_DASHBOARD')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'ADMIN_DASHBOARD' ? 'text-primary' : 'text-slate-400'}`}>
+                <span className="material-symbols-outlined text-[28px]">admin_panel_settings</span>
+                <span className="text-[10px] font-bold">Admin</span>
+              </button>
+            )}
           </nav>
 
           {/* Desktop Sidebar */}
@@ -634,6 +713,12 @@ const App: React.FC = () => {
                 <span className="material-symbols-outlined">settings</span>
                 <span>Perfil</span>
               </button>
+              {user?.role === 'admin' && (
+                <button onClick={() => setCurrentView('ADMIN_DASHBOARD')} className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${currentView === 'ADMIN_DASHBOARD' ? 'bg-primary/10 text-primary font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'}`}>
+                  <span className="material-symbols-outlined">admin_panel_settings</span>
+                  <span>Admin</span>
+                </button>
+              )}
             </div>
             
             {user && (

@@ -52,8 +52,9 @@ const CompanyList: React.FC<Props> = ({ companies, events, onNavigate, onNew, on
 
       <main className="px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {companies.map(company => (
-          <div key={company.id} className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col">
-            <div className="flex justify-between items-start mb-4">
+          <div key={company.id} className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col relative overflow-hidden">
+            <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: company.color || '#e2e8f0' }}></div>
+            <div className="flex justify-between items-start mb-4 pl-2">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 overflow-hidden border border-slate-200 dark:border-slate-700">
                   {company.logo_url ? (

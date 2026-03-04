@@ -25,14 +25,24 @@ interface HistoryItem {
 const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLeft, user }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [todayEvents, setTodayEvents] = useState<PlanEvent[]>([]);
+  const [notifUpcomingEvents, setNotifUpcomingEvents] = useState<PlanEvent[]>([]);
   const [showDailyAlert, setShowDailyAlert] = useState(false);
 
   useEffect(() => {
     const today = getTodayString();
-    const filtered = events.filter(e => e.date === today);
-    setTodayEvents(filtered);
+    
+    // Calculate date 7 days from now
+    const nextWeekDate = new Date();
+    nextWeekDate.setDate(nextWeekDate.getDate() + 7);
+    const nextWeekString = nextWeekDate.toISOString().split('T')[0];
 
-    if (filtered.length > 0) {
+    const todayFiltered = events.filter(e => e.date === today);
+    const upcomingFiltered = events.filter(e => e.date > today && e.date <= nextWeekString).sort((a, b) => a.date.localeCompare(b.date));
+    
+    setTodayEvents(todayFiltered);
+    setNotifUpcomingEvents(upcomingFiltered);
+
+    if (todayFiltered.length > 0) {
       const lastNotified = localStorage.getItem('lastNotifiedDate');
       if (lastNotified !== today) {
         // Show the custom modal alert
@@ -49,7 +59,7 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
           if ('Notification' in window) {
             if (Notification.permission === 'granted') {
               new Notification('PlanEventos', {
-                body: `Você tem ${filtered.length} evento(s) hoje!`,
+                body: `Você tem ${todayFiltered.length} evento(s) hoje!`,
                 icon: '/vite.svg'
               });
             }
@@ -166,6 +176,50 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
     return `${diffDays}d atrás`;
   };
 
+  const handleConnectGoogleCalendar = async () => {
+    if (!user?.uid) return;
+    try {
+      const origin = window.location.origin;
+      const redirectUri = `${origin}/api/auth/google/callback`;
+      console.log('[Google Auth] Using redirectUri:', redirectUri);
+      
+      const response = await fetch(`/api/auth/google/url?userId=${user.uid}&redirectUri=${encodeURIComponent(redirectUri)}`);
+      if (!response.ok) throw new Error('Failed to get auth URL');
+      
+      const { url } = await response.json();
+      
+      const authWindow = window.open(
+        url,
+        'google_oauth',
+        'width=600,height=700'
+      );
+
+      if (!authWindow) {
+        alert('Por favor, permita popups para conectar sua agenda do Google.');
+      }
+    } catch (error) {
+      console.error('Error connecting to Google Calendar:', error);
+      alert('Erro ao iniciar conexão com o Google Calendar.');
+    }
+  };
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const origin = event.origin;
+      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
+        return;
+      }
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+        alert('Google Calendar conectado com sucesso! Recarregue a página para atualizar o status.');
+        window.location.reload();
+      } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
+        alert(`Erro na conexão: ${event.data.error}`);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   return (
     <div className="pb-32 animate-in fade-in duration-700 relative">
       {showDailyAlert && (
@@ -220,12 +274,16 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
         </div>
         <div className="flex items-center gap-2 w-10 justify-end relative">
           <button onClick={() => setShowNotifications(!showNotifications)} className="p-2 rounded-full relative">
-            <span className={`material-symbols-outlined text-brand-navy dark:text-slate-400 ${todayEvents.length > 0 ? 'animate-[swing_2s_ease-in-out_infinite]' : ''}`}>notifications</span>
-            {todayEvents.length > 0 && <span className="absolute top-1.5 right-1.5 size-2.5 bg-brand-orange border-2 border-white dark:border-background-dark rounded-full"></span>}
+            <span className={`material-symbols-outlined text-brand-navy dark:text-slate-400 ${(todayEvents.length > 0 || notifUpcomingEvents.length > 0) ? 'animate-[swing_2s_ease-in-out_infinite]' : ''}`}>notifications</span>
+            {(todayEvents.length > 0 || notifUpcomingEvents.length > 0) && (
+              <span className="absolute top-0 right-0 min-w-[16px] h-4 px-1 bg-brand-orange border-2 border-white dark:border-background-dark rounded-full flex items-center justify-center text-[8px] font-black text-white">
+                {todayEvents.length + notifUpcomingEvents.length}
+              </span>
+            )}
           </button>
           
           {showNotifications && (
-            <div className="absolute top-12 right-0 w-72 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 p-4 z-50 animate-in slide-in-from-top-2">
+            <div className="absolute top-12 right-0 w-80 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 p-4 z-50 animate-in slide-in-from-top-2 max-h-[80vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="font-bold text-slate-800 dark:text-white text-sm">Notificações</h3>
                 {'Notification' in window && Notification.permission !== 'granted' && (
@@ -237,19 +295,55 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
                   </button>
                 )}
               </div>
-              {todayEvents.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Você tem {todayEvents.length} evento(s) hoje:</p>
-                  {todayEvents.map(e => (
-                    <div key={e.id} className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                      <p className="text-sm font-bold text-brand-navy dark:text-white truncate">{e.title}</p>
-                      <p className="text-[10px] text-slate-500 truncate">{e.location || 'Local a definir'}</p>
+              
+              <div className="space-y-4">
+                {todayEvents.length > 0 && (
+                  <div>
+                    <p className="text-xs font-black text-brand-orange uppercase tracking-wider mb-2 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">today</span>
+                      Hoje ({todayEvents.length})
+                    </p>
+                    <div className="space-y-2">
+                      {todayEvents.map(e => (
+                        <div key={e.id} className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-100 dark:border-orange-900/30">
+                          <p className="text-sm font-bold text-brand-navy dark:text-white truncate">{e.title}</p>
+                          <p className="text-[10px] text-slate-500 truncate">{e.location || 'Local a definir'}</p>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-4">Nenhum evento para hoje.</p>
-              )}
+                  </div>
+                )}
+
+                {notifUpcomingEvents.length > 0 && (
+                  <div>
+                    <p className="text-xs font-black text-brand-navy dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">event_upcoming</span>
+                      Próximos 7 dias ({notifUpcomingEvents.length})
+                    </p>
+                    <div className="space-y-2">
+                      {notifUpcomingEvents.map(e => {
+                        const eventDate = new Date(e.date + 'T12:00:00');
+                        const dateStr = eventDate.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                        return (
+                          <div key={e.id} className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-bold text-brand-navy dark:text-white truncate">{e.title}</p>
+                              <p className="text-[10px] text-slate-500 truncate">{e.location || 'Local a definir'}</p>
+                            </div>
+                            <div className="text-[10px] font-bold text-brand-navy dark:text-slate-300 bg-white dark:bg-slate-900 px-2 py-1 rounded-md shadow-sm ml-2 shrink-0">
+                              {dateStr}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {todayEvents.length === 0 && notifUpcomingEvents.length === 0 && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-4">Nenhum evento para os próximos dias.</p>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -287,6 +381,24 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
                   <span className="material-symbols-outlined text-sm">workspace_premium</span>
                   <span className="text-[10px] font-black uppercase tracking-widest">Assinar Agora</span>
                 </button>
+              )}
+              
+              {!user?.google_calendar_connected ? (
+                <button 
+                  onClick={handleConnectGoogleCalendar}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-700 shadow-sm active:scale-95 transition-all hover:bg-slate-50"
+                >
+                  <img src="https://www.gstatic.com/images/branding/product/1x/calendar_48dp.png" alt="Google Calendar" className="w-4 h-4" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Conectar Agenda</span>
+                </button>
+              ) : (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 text-green-700 shadow-sm">
+                  <div className="relative">
+                    <img src="https://www.gstatic.com/images/branding/product/1x/calendar_48dp.png" alt="Google Calendar" className="w-4 h-4 opacity-50" />
+                    <span className="material-symbols-outlined text-[10px] absolute -top-1 -right-1 bg-green-500 text-white rounded-full">check</span>
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Agenda Conectada</span>
+                </div>
               )}
             </div>
           </div>

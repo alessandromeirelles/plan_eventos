@@ -247,12 +247,24 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredEvents.map(event => (
-            <div key={event.id} className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md flex flex-col">
-              <div className="flex justify-between items-start mb-2">
+          {filteredEvents.map(event => {
+            const company = companies.find(c => c.id === event.company_id);
+            const companyColor = company?.color;
+            
+            // Generate Google Calendar Link
+            const eventDate = new Date(event.date + (event.time ? `T${event.time}:00` : 'T09:00:00'));
+            const endDate = new Date(eventDate.getTime() + 60 * 60 * 1000); // +1 hour
+            
+            const formatGoogleDate = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
+            const googleCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${formatGoogleDate(eventDate)}/${formatGoogleDate(endDate)}&details=${encodeURIComponent('Empresa: ' + (company?.name || ''))}&location=${encodeURIComponent(event.location || '')}`;
+
+            return (
+            <div key={event.id} className="rounded-xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md flex flex-col relative overflow-hidden" style={{ backgroundColor: companyColor ? `${companyColor}20` : 'var(--bg-white)', borderColor: companyColor ? `${companyColor}40` : undefined }}>
+              <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: companyColor || '#e2e8f0' }}></div>
+              <div className="flex justify-between items-start mb-2 pl-2">
                 <div className="flex flex-col">
                   <h3 className="font-bold text-slate-800 dark:text-white">{event.title}</h3>
-                  <span className="text-xs text-slate-500 font-medium">{companies.find(c => c.id === event.company_id)?.name || 'Empresa não encontrada'}</span>
+                  <span className="text-xs text-slate-500 font-medium">{company?.name || 'Empresa não encontrada'}</span>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <div className="relative group">
@@ -294,10 +306,10 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-y-2 text-sm mb-4 flex-1">
+              <div className="grid grid-cols-2 gap-y-2 text-sm mb-4 flex-1 pl-2">
                 <div className="flex items-center gap-2 text-slate-500">
                   <span className="material-symbols-outlined text-sm">calendar_month</span>
-                  <span>{event.date.split('-').reverse().join('/')}</span>
+                  <span>{event.date.split('-').reverse().join('/')} {event.time ? `- ${event.time}` : ''}</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-500">
                   <span className="material-symbols-outlined text-sm">business</span>
@@ -312,7 +324,17 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
                   <span>R$ {event.value.toLocaleString('pt-BR')}</span>
                 </div>
               </div>
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-50 dark:border-slate-800 mt-auto">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-50 dark:border-slate-800 mt-auto pl-2">
+                <a 
+                  href={googleCalUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs font-semibold text-slate-400 hover:text-blue-500 transition-colors mr-auto"
+                  title="Adicionar ao Google Calendar"
+                >
+                  <span className="material-symbols-outlined text-lg">calendar_add_on</span>
+                  Agenda
+                </a>
                 <button 
                   onClick={() => onEdit(event)}
                   className="flex items-center gap-1 text-xs font-semibold text-slate-400 hover:text-primary transition-colors"
@@ -329,7 +351,7 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
                 </button>
               </div>
             </div>
-          ))}
+          )})}
           
           {filteredEvents.length === 0 && (
             <div className="text-center py-20 opacity-50">

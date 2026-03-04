@@ -22,12 +22,14 @@ export interface Company {
   icon: string;
   logo_url?: string;
   user_id?: string;
+  color?: string;
 }
 
 export interface PlanEvent {
   id: string;
   title: string;
   date: string;
+  time?: string;
   location?: string;
   type: string;
   company_id: string;
@@ -40,11 +42,13 @@ export interface PlanEvent {
   updated_at?: string;
   paid_at?: string;
   invoice_issued_at?: string;
+  google_calendar_event_id?: string;
 }
 
 export type ViewState = 'LANDING' | 'AUTH' | 'DASHBOARD' | 'EVENTS' | 'COMPANIES' | 'NEW_EVENT' | 'EDIT_EVENT' | 'NEW_COMPANY' | 'EDIT_COMPANY' | 'SETTINGS' | 'SUBSCRIPTION' | 'CHECKOUT' | 'ADMIN_DASHBOARD';
 
 export interface User {
+  uid?: string;
   email: string;
   name: string;
   photo?: string;
@@ -57,4 +61,6 @@ export interface User {
   cnpj?: string;
   status?: 'active' | 'suspended' | 'deleted';
   event_types?: string[];
+  google_calendar_connected?: boolean;
+  role?: 'admin' | 'user';
 }

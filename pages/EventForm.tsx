@@ -22,6 +22,7 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
     id: initialData?.id || 'EV-' + Math.floor(1000 + Math.random() * 9000),
     title: initialData?.title || '',
     date: initialData?.date || getTodayString(),
+    time: initialData?.time || '',
     type: initialData?.type || (eventTypes[0] || ''),
     company_id: initialData?.company_id || (companies[0]?.id || ''),
     status: initialData?.status || EventStatus.PENDING,
@@ -33,7 +34,10 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData as PlanEvent);
+    onSave({
+      ...initialData,
+      ...formData
+    } as PlanEvent);
   };
 
   const handleAddType = () => {
@@ -157,6 +161,18 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
                   onChange={e => setFormData({...formData, date: e.target.value})}
                 />
               </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Horário</label>
+                <input 
+                  type="time"
+                  className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary dark:text-white"
+                  value={formData.time}
+                  onChange={e => setFormData({...formData, time: e.target.value})}
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Tipo de Evento</label>

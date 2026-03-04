@@ -72,9 +72,10 @@ const CompanyForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
-      id: initialData?.id || '',
-      ...formData
-    });
+      ...initialData,
+      ...formData,
+      id: initialData?.id || ''
+    } as Company);
   };
 
   return (
@@ -88,7 +89,9 @@ const CompanyForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
           <button onClick={onCancel} className="text-gray-500 hover:bg-gray-100 p-1 rounded-full">
             <span className="material-symbols-outlined">close</span>
           </button>
-          <h1 className="text-lg font-bold text-gray-900 dark:text-white">Nova Empresa / Cliente</h1>
+          <h1 className="text-lg font-bold text-gray-900 dark:text-white">
+            {initialData ? 'Editar Cliente' : 'Novo Cliente'}
+          </h1>
           <div className="w-8"></div>
         </div>
 
