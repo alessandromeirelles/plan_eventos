@@ -32,6 +32,14 @@ const App: React.FC = () => {
   const [successPopup, setSuccessPopup] = useState<{show: boolean, message: string}>({show: false, message: ''});
   const [errorPopup, setErrorPopup] = useState<{show: boolean, message: string}>({show: false, message: ''});
   const [confirmPopup, setConfirmPopup] = useState<{show: boolean, message: string, onConfirm: () => void}>({show: false, message: '', onConfirm: () => {}});
+  const [showValues, setShowValues] = useState(() => {
+    const saved = localStorage.getItem('showValues');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('showValues', JSON.stringify(showValues));
+  }, [showValues]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -546,8 +554,8 @@ const App: React.FC = () => {
     switch (currentView) {
       case 'LANDING': return <Landing onNavigate={setCurrentView} />;
       case 'AUTH': return <Auth onLogin={handleLogin} onCancel={() => setCurrentView('LANDING')} />;
-      case 'DASHBOARD': return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getDaysLeft()} user={user} />;
-      case 'EVENTS': return <EventList events={events} companies={companies} eventTypes={eventTypes} onDelete={handleDeleteEvent} onStatusChange={handleEventStatusChange} onInvoiceStatusChange={handleInvoiceStatusChange} onEdit={(e) => { setEditingEvent(e); setCurrentView('EDIT_EVENT'); }} onNavigate={setCurrentView} onNew={() => { setEditingEvent(null); setCurrentView('NEW_EVENT'); }} />;
+      case 'DASHBOARD': return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getDaysLeft()} user={user} showValues={showValues} setShowValues={setShowValues} />;
+      case 'EVENTS': return <EventList events={events} companies={companies} eventTypes={eventTypes} onDelete={handleDeleteEvent} onStatusChange={handleEventStatusChange} onInvoiceStatusChange={handleInvoiceStatusChange} onEdit={(e) => { setEditingEvent(e); setCurrentView('EDIT_EVENT'); }} onNavigate={setCurrentView} onNew={() => { setEditingEvent(null); setCurrentView('NEW_EVENT'); }} showValues={showValues} />;
       case 'COMPANIES': return <CompanyList companies={companies} events={events} onDelete={handleDeleteCompany} onNavigate={setCurrentView} onNew={() => { setEditingCompany(null); setCurrentView('NEW_COMPANY'); }} onEdit={(c) => { setEditingCompany(c); setCurrentView('EDIT_COMPANY'); }} />;
       case 'NEW_EVENT':
       case 'EDIT_EVENT': return <EventForm companies={companies} eventTypes={eventTypes} onUpdateEventTypes={handleUpdateEventTypes} initialData={editingEvent || undefined} onSave={handleSaveEvent} onCancel={() => { setEditingEvent(null); setCurrentView('EVENTS'); }} onNewCompany={() => setCurrentView('NEW_COMPANY')} />;

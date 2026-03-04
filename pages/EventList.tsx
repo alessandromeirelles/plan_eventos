@@ -16,9 +16,10 @@ interface Props {
   onNew: () => void;
   onStatusChange: (id: string, newStatus: EventStatus) => void;
   onInvoiceStatusChange: (id: string, newStatus: InvoiceStatus) => void;
+  showValues: boolean;
 }
 
-const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, onEdit, onNavigate, onNew, onStatusChange, onInvoiceStatusChange }) => {
+const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, onEdit, onNavigate, onNew, onStatusChange, onInvoiceStatusChange, showValues }) => {
   const [activeTab, setActiveTab] = useState<'Todos' | EventStatus | 'Empresa'>('Todos');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -195,7 +196,7 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
             <div className="relative z-10">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total (Mês Atual)</p>
               <h3 className="text-lg font-black text-brand-orange">
-                R$ {currentMonthValue.toLocaleString('pt-BR')}
+                {showValues ? `R$ ${currentMonthValue.toLocaleString('pt-BR')}` : 'R$ ••••••'}
               </h3>
               <p className="text-[10px] font-bold text-slate-500 mt-1">
                 {currentMonthEvents.length} {currentMonthEvents.length === 1 ? 'evento' : 'eventos'} ({currentMonthRealizedCount} {currentMonthRealizedCount === 1 ? 'realizado' : 'realizados'})
@@ -213,7 +214,7 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
                 {upcomingEventsCount} <span className="text-xs font-bold text-slate-400">agendados</span>
               </h3>
               <p className="text-[10px] font-bold text-slate-500 mt-1">
-                R$ {upcomingEventsValue.toLocaleString('pt-BR')}
+                {showValues ? `R$ ${upcomingEventsValue.toLocaleString('pt-BR')}` : 'R$ ••••••'}
               </p>
             </div>
           </div>
@@ -225,7 +226,7 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
               {activeTab === 'Todos' ? 'Total Geral' : `Total ${activeTab.charAt(0) + activeTab.slice(1).toLowerCase()}`}
             </p>
             <h2 className="text-2xl font-black text-brand-navy dark:text-white">
-              R$ {totalValue.toLocaleString('pt-BR')}
+              {showValues ? `R$ ${totalValue.toLocaleString('pt-BR')}` : 'R$ ••••••'}
             </h2>
           </div>
           <div className={`p-3 rounded-xl ${activeTab === 'Todos' ? 'bg-slate-100 text-slate-400' : getStatusColor(activeTab as EventStatus)}`}>
@@ -321,7 +322,7 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
                 </div>
                 <div className="flex items-center gap-2 text-slate-500 font-bold">
                   <span className="material-symbols-outlined text-sm">payments</span>
-                  <span>R$ {event.value.toLocaleString('pt-BR')}</span>
+                  <span>{showValues ? `R$ ${event.value.toLocaleString('pt-BR')}` : 'R$ •••'}</span>
                 </div>
               </div>
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-50 dark:border-slate-800 mt-auto pl-2">

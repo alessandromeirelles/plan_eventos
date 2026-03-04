@@ -164,6 +164,33 @@ async function startServer() {
       }
     });
 
+    // Database Backup Endpoint
+    app.get("/api/admin/backup", async (req, res) => {
+      try {
+        const firestore = getDb();
+        const collections = ["users", "companies", "events"];
+        const backupData: any = {};
+
+        for (const colName of collections) {
+          const snap = await firestore.collection(colName).get();
+          backupData[colName] = snap.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+        }
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const filename = `backup-planeventos-${timestamp}.json`;
+
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+        res.send(JSON.stringify(backupData, null, 2));
+      } catch (error) {
+        console.error("[Backup] Error creating backup:", error);
+        res.status(500).json({ error: "Failed to create database backup" });
+      }
+    });
+
     // Google OAuth Endpoints
     app.get("/api/auth/google/url", (req, res) => {
       const { userId, redirectUri } = req.query;

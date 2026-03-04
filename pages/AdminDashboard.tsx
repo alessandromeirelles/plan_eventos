@@ -65,7 +65,7 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Gerenciamento de Usuários</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button 
             onClick={async () => {
               if (confirm('Deseja processar os e-mails de retenção para todos os usuários inativos?')) {
@@ -78,10 +78,19 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
                 }
               }
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-brand-cyan text-white text-xs font-black uppercase tracking-widest rounded-xl hover:scale-105 transition-all shadow-lg shadow-brand-cyan/20"
+            className="flex items-center gap-2 px-3 py-2 bg-brand-cyan text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-105 transition-all shadow-lg shadow-brand-cyan/20"
           >
             <span className="material-symbols-outlined text-sm">mail</span>
-            <span>Processar Retenção</span>
+            <span className="hidden sm:inline">Processar Retenção</span>
+          </button>
+          <button 
+            onClick={() => {
+              window.location.href = '/api/admin/backup';
+            }}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-105 transition-all shadow-lg shadow-slate-800/20"
+          >
+            <span className="material-symbols-outlined text-sm">backup</span>
+            <span className="hidden sm:inline">Fazer Backup</span>
           </button>
           <button 
             onClick={onLogout}

@@ -12,6 +12,8 @@ interface Props {
   onNavigate: (view: ViewState) => void;
   trialDaysLeft: number;
   user?: User | null;
+  showValues: boolean;
+  setShowValues: (show: boolean) => void;
 }
 
 interface HistoryItem {
@@ -22,7 +24,7 @@ interface HistoryItem {
   event: PlanEvent;
 }
 
-const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLeft, user }) => {
+const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLeft, user, showValues, setShowValues }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [todayEvents, setTodayEvents] = useState<PlanEvent[]>([]);
   const [notifUpcomingEvents, setNotifUpcomingEvents] = useState<PlanEvent[]>([]);
@@ -358,6 +360,15 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
             <div className="flex items-center gap-2 mb-6">
               <span className="material-symbols-outlined text-brand-navy dark:text-brand-orange text-2xl">dashboard</span>
               <h2 className="text-2xl font-black text-brand-navy dark:text-white tracking-tight">Dashboard</h2>
+              <button 
+                onClick={() => setShowValues(!showValues)}
+                className="ml-auto p-2 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"
+                title={showValues ? "Ocultar Valores" : "Mostrar Valores"}
+              >
+                <span className="material-symbols-outlined text-sm">
+                  {showValues ? 'visibility' : 'visibility_off'}
+                </span>
+              </button>
             </div>
             
             <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -383,23 +394,30 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
                 </button>
               )}
               
-              {!user?.google_calendar_connected ? (
-                <button 
-                  onClick={handleConnectGoogleCalendar}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-700 shadow-sm active:scale-95 transition-all hover:bg-slate-50"
-                >
-                  <img src="https://www.gstatic.com/images/branding/product/1x/calendar_48dp.png" alt="Google Calendar" className="w-4 h-4" />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Conectar Agenda</span>
-                </button>
-              ) : (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 text-green-700 shadow-sm">
-                  <div className="relative">
-                    <img src="https://www.gstatic.com/images/branding/product/1x/calendar_48dp.png" alt="Google Calendar" className="w-4 h-4 opacity-50" />
-                    <span className="material-symbols-outlined text-[10px] absolute -top-1 -right-1 bg-green-500 text-white rounded-full">check</span>
+              <div className="flex flex-col gap-1">
+                {!user?.google_calendar_connected ? (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[8px] font-black text-brand-orange uppercase tracking-widest ml-2 animate-pulse">
+                      ⚠️ Em breve
+                    </span>
+                    <button 
+                      disabled
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-400 shadow-none cursor-not-allowed opacity-70"
+                    >
+                      <img src="https://www.gstatic.com/images/branding/product/1x/calendar_48dp.png" alt="Google Calendar" className="w-4 h-4 grayscale" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Conectar Agenda</span>
+                    </button>
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest">Agenda Conectada</span>
-                </div>
-              )}
+                ) : (
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 text-green-700 shadow-sm">
+                    <div className="relative">
+                      <img src="https://www.gstatic.com/images/branding/product/1x/calendar_48dp.png" alt="Google Calendar" className="w-4 h-4 opacity-50" />
+                      <span className="material-symbols-outlined text-[10px] absolute -top-1 -right-1 bg-green-500 text-white rounded-full">check</span>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Agenda Conectada</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex flex-col items-center gap-2 shrink-0">
@@ -425,7 +443,9 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
               <span className="material-symbols-outlined text-5xl">payments</span>
             </div>
             <div className="relative z-10 flex flex-col">
-              <span className="text-2xl font-black text-brand-orange">R$ {totalValueThisMonth.toLocaleString('pt-BR')}</span>
+              <span className="text-2xl font-black text-brand-orange">
+                {showValues ? `R$ ${totalValueThisMonth.toLocaleString('pt-BR')}` : 'R$ ••••••'}
+              </span>
               <span className="text-[10px] font-bold text-slate-400">Neste mês</span>
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest relative z-10">Total (Mês)</p>
@@ -448,7 +468,9 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
                   <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">{event.title}</h3>
                   <div className="flex items-center gap-3 mt-1">
                     <span className="text-[10px] font-black text-slate-400 uppercase">{event.type}</span>
-                    <span className="text-[10px] font-black text-brand-orange">R$ {event.value.toLocaleString('pt-BR')}</span>
+                    <span className="text-[10px] font-black text-brand-orange">
+                      {showValues ? `R$ ${event.value.toLocaleString('pt-BR')}` : 'R$ •••'}
+                    </span>
                   </div>
                   <div className="flex items-center gap-1 mt-1.5 text-slate-500">
                     <span className="material-symbols-outlined text-[10px]">calendar_month</span>
