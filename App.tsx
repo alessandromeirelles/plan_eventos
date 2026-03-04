@@ -126,7 +126,13 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user && user.uid) {
+      const updateActivity = async () => {
+        const now = new Date().toISOString();
+        const userRef = doc(db, 'users', user.uid!);
+        await updateDoc(userRef, { last_activity: now });
+      };
+      updateActivity();
       fetchData();
     }
   }, [user]);

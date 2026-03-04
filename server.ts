@@ -7,6 +7,7 @@ import { XMLParser } from "fast-xml-parser";
 import path from "path";
 import fs from "fs";
 import { google } from "googleapis";
+import nodemailer from "nodemailer";
 
 // Initialize Firebase Admin lazily to prevent crashes if env vars are missing
 let db: admin.firestore.Firestore;
@@ -33,6 +34,33 @@ function getDb() {
     db = admin.firestore();
   }
   return db;
+}
+
+async function sendRetentionEmail(to: string, subject: string, text: string) {
+  const host = process.env.SMTP_HOST;
+  const port = parseInt(process.env.SMTP_PORT || "587");
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM || user;
+
+  if (!host || !user || !pass) {
+    console.warn("⚠️ SMTP credentials missing. Skipping email to:", to);
+    return;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+
+  try {
+    await transporter.sendMail({ from, to, subject, text });
+    console.log(`[Email] Sent to ${to}: ${subject}`);
+  } catch (error) {
+    console.error(`[Email] Failed to send to ${to}:`, error);
+  }
 }
 
 async function getGoogleAuthClient(userId: string) {
@@ -74,6 +102,66 @@ async function startServer() {
 
     app.get("/api/health", (req, res) => {
       res.json({ status: "ok", timestamp: new Date().toISOString() });
+    });
+
+    // Retention Emails Processing
+    app.post("/api/admin/process-retention", async (req, res) => {
+      try {
+        const firestore = getDb();
+        const usersSnap = await firestore.collection("users").get();
+        const now = new Date();
+        let processedCount = 0;
+        let emailsSentCount = 0;
+
+        for (const doc of usersSnap.docs) {
+          const userData = doc.data();
+          if (!userData.email || !userData.last_activity) continue;
+
+          const lastActivity = new Date(userData.last_activity);
+          const diffDays = Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
+          const emailsSent = userData.emails_sent || [];
+
+          let subject = "";
+          let text = "";
+          let key = "";
+
+          if (diffDays >= 29 && !emailsSent.includes('29d')) {
+            key = '29d';
+            subject = "Que pena, seu trial vai expirar!";
+            text = `Olá ${userData.name},\n\nNotamos que você não aparece há algum tempo. Seu período de teste está chegando ao fim. Não perca a chance de continuar organizado!`;
+          } else if (diffDays >= 21 && !emailsSent.includes('21d')) {
+            key = '21d';
+            subject = "O tempo está acabando!";
+            text = `Olá ${userData.name},\n\nO tempo voa! Já faz 21 dias que não te vemos. Volte agora e garanta sua organização.`;
+          } else if (diffDays >= 14 && !emailsSent.includes('14d')) {
+            key = '14d';
+            subject = "Sentimos sua falta!";
+            text = `Olá ${userData.name},\n\nEstamos passando para te chamar de volta. O Planeventos está com novidades para te ajudar no dia a dia.`;
+          } else if (diffDays >= 7 && !emailsSent.includes('7d')) {
+            key = '7d';
+            subject = "Dê uma chance para a organização!";
+            text = `Olá ${userData.name},\n\nDê uma chance para o aplicativo e você terá sucesso em se organizar. Estamos aqui para facilitar sua vida.`;
+          } else if (diffDays >= 3 && !emailsSent.includes('3d')) {
+            key = '3d';
+            subject = "Estamos sentindo saudades!";
+            text = `Olá ${userData.name},\n\nJá faz 3 dias que você não aparece. Tudo bem por aí? Volte e continue planejando seus eventos!`;
+          }
+
+          if (key) {
+            await sendRetentionEmail(userData.email, subject, text);
+            await doc.ref.update({
+              emails_sent: admin.firestore.FieldValue.arrayUnion(key)
+            });
+            emailsSentCount++;
+          }
+          processedCount++;
+        }
+
+        res.json({ success: true, processed: processedCount, sent: emailsSentCount });
+      } catch (error) {
+        console.error("[Retention] Error processing:", error);
+        res.status(500).json({ error: "Failed to process retention emails" });
+      }
     });
 
     // Google OAuth Endpoints

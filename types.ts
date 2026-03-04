@@ -63,4 +63,6 @@ export interface User {
   event_types?: string[];
   google_calendar_connected?: boolean;
   role?: 'admin' | 'user';
+  last_activity?: string;
+  emails_sent?: string[]; // List of keys like '3d', '7d', etc.
 }

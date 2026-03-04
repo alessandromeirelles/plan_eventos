@@ -65,13 +65,32 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Gerenciamento de Usuários</p>
           </div>
         </div>
-        <button 
-          onClick={onLogout}
-          className="p-2 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-full hover:bg-red-100 transition-colors"
-          title="Sair"
-        >
-          <span className="material-symbols-outlined">logout</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={async () => {
+              if (confirm('Deseja processar os e-mails de retenção para todos os usuários inativos?')) {
+                try {
+                  const res = await fetch('/api/admin/process-retention', { method: 'POST' });
+                  const data = await res.json();
+                  alert(`Processamento concluído!\nUsuários verificados: ${data.processed}\nE-mails enviados: ${data.sent}`);
+                } catch (err) {
+                  alert('Erro ao processar retenção.');
+                }
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-brand-cyan text-white text-xs font-black uppercase tracking-widest rounded-xl hover:scale-105 transition-all shadow-lg shadow-brand-cyan/20"
+          >
+            <span className="material-symbols-outlined text-sm">mail</span>
+            <span>Processar Retenção</span>
+          </button>
+          <button 
+            onClick={onLogout}
+            className="p-2 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-full hover:bg-red-100 transition-colors"
+            title="Sair"
+          >
+            <span className="material-symbols-outlined">logout</span>
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-3 gap-4 mb-8">
@@ -119,15 +138,25 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl">
+                <div className="grid grid-cols-4 gap-2 text-[10px] text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl">
                   <div>
                     <span className="font-bold uppercase">Inscrição:</span><br/>
                     {user.trial_start_date ? new Date(user.trial_start_date).toLocaleDateString('pt-BR') : 'N/A'}
                   </div>
                   <div>
+                    <span className="font-bold uppercase">Atividade:</span><br/>
+                    {user.last_activity ? new Date(user.last_activity).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                  </div>
+                  <div>
                     <span className="font-bold uppercase">Pagamento:</span><br/>
                     <span className={user.subscription_status === 'active' ? 'text-emerald-500 font-bold' : ''}>
                       {user.subscription_status === 'active' ? 'Ativo' : user.subscription_status === 'expired' ? 'Expirado' : 'Trial'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-bold uppercase">Retenção:</span><br/>
+                    <span className="text-brand-cyan font-bold">
+                      {user.emails_sent?.length || 0} envios
                     </span>
                   </div>
                 </div>
