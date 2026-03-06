@@ -14,6 +14,7 @@ import CompanyForm from './pages/CompanyForm';
 import Checkout from './pages/Checkout';
 import Settings from './pages/Settings';
 import AdminDashboard from './pages/AdminDashboard';
+import Reports from './pages/Reports';
 import Logo from './components/Logo';
 
 const DEFAULT_EVENT_TYPES = ['Workshop', 'Casamento', 'Corporativo', 'Aniversário', 'Jantar'];
@@ -555,7 +556,7 @@ const App: React.FC = () => {
       case 'LANDING': return <Landing onNavigate={setCurrentView} />;
       case 'AUTH': return <Auth onLogin={handleLogin} onCancel={() => setCurrentView('LANDING')} />;
       case 'DASHBOARD': return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getDaysLeft()} user={user} showValues={showValues} setShowValues={setShowValues} />;
-      case 'EVENTS': return <EventList events={events} companies={companies} eventTypes={eventTypes} onDelete={handleDeleteEvent} onStatusChange={handleEventStatusChange} onInvoiceStatusChange={handleInvoiceStatusChange} onEdit={(e) => { setEditingEvent(e); setCurrentView('EDIT_EVENT'); }} onNavigate={setCurrentView} onNew={() => { setEditingEvent(null); setCurrentView('NEW_EVENT'); }} showValues={showValues} />;
+      case 'EVENTS': return <EventList events={events} companies={companies} eventTypes={eventTypes} onDelete={handleDeleteEvent} onStatusChange={handleEventStatusChange} onInvoiceStatusChange={handleInvoiceStatusChange} onEdit={(e) => { setEditingEvent(e); setCurrentView('EDIT_EVENT'); }} onNavigate={setCurrentView} onNew={() => { setEditingEvent(null); setCurrentView('NEW_EVENT'); }} showValues={showValues} setShowValues={setShowValues} />;
       case 'COMPANIES': return <CompanyList companies={companies} events={events} onDelete={handleDeleteCompany} onNavigate={setCurrentView} onNew={() => { setEditingCompany(null); setCurrentView('NEW_COMPANY'); }} onEdit={(c) => { setEditingCompany(c); setCurrentView('EDIT_COMPANY'); }} />;
       case 'NEW_EVENT':
       case 'EDIT_EVENT': return <EventForm companies={companies} eventTypes={eventTypes} onUpdateEventTypes={handleUpdateEventTypes} initialData={editingEvent || undefined} onSave={handleSaveEvent} onCancel={() => { setEditingEvent(null); setCurrentView('EVENTS'); }} onNewCompany={() => setCurrentView('NEW_COMPANY')} />;
@@ -575,7 +576,8 @@ const App: React.FC = () => {
         ) : null;
       case 'CHECKOUT': return <Checkout plan={selectedPlan} userId={auth.currentUser?.uid || ''} onSuccess={handleSubscriptionSuccess} onCancel={() => setCurrentView('DASHBOARD')} />;
       case 'ADMIN_DASHBOARD': return <AdminDashboard onLogout={handleLogout} onNavigate={setCurrentView} />;
-      default: return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getDaysLeft()} user={user} />;
+      case 'REPORTS': return <Reports events={events} onNavigate={setCurrentView} showValues={showValues} />;
+      default: return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getDaysLeft()} user={user} showValues={showValues} setShowValues={setShowValues} />;
     }
   };
 
@@ -688,9 +690,13 @@ const App: React.FC = () => {
               <span className="material-symbols-outlined text-[28px]">corporate_fare</span>
               <span className="text-[10px] font-bold">Clientes</span>
             </button>
-            <button onClick={() => setCurrentView('EVENTS')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'EVENTS' ? 'text-primary' : 'text-slate-400'}`}>
+            <button onClick={async () => setCurrentView('EVENTS')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'EVENTS' ? 'text-primary' : 'text-slate-400'}`}>
               <span className="material-symbols-outlined text-[28px]">calendar_month</span>
               <span className="text-[10px] font-bold">Eventos</span>
+            </button>
+            <button onClick={() => setCurrentView('REPORTS')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'REPORTS' ? 'text-primary' : 'text-slate-400'}`}>
+              <span className="material-symbols-outlined text-[28px]">analytics</span>
+              <span className="text-[10px] font-bold">Relatórios</span>
             </button>
             <button onClick={() => setCurrentView('SETTINGS')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'SETTINGS' ? 'text-primary' : 'text-slate-400'}`}>
               <span className="material-symbols-outlined text-[28px]">settings</span>
@@ -722,6 +728,10 @@ const App: React.FC = () => {
               <button onClick={() => setCurrentView('EVENTS')} className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${currentView === 'EVENTS' ? 'bg-primary/10 text-primary font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'}`}>
                 <span className="material-symbols-outlined">calendar_month</span>
                 <span>Eventos</span>
+              </button>
+              <button onClick={() => setCurrentView('REPORTS')} className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${currentView === 'REPORTS' ? 'bg-primary/10 text-primary font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'}`}>
+                <span className="material-symbols-outlined">analytics</span>
+                <span>Relatórios</span>
               </button>
               <button onClick={() => setCurrentView('SETTINGS')} className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${currentView === 'SETTINGS' ? 'bg-primary/10 text-primary font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'}`}>
                 <span className="material-symbols-outlined">settings</span>

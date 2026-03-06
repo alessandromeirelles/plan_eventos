@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import axios from "axios";
-import * as admin from "firebase-admin";
+import admin from "firebase-admin";
 import { XMLParser } from "fast-xml-parser";
 import path from "path";
 import fs from "fs";
@@ -14,21 +14,74 @@ let db: admin.firestore.Firestore;
 
 function getDb() {
   if (!db) {
-    if (!admin.apps.length) {
-      const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+    const apps = admin.apps || [];
+    if (apps.length === 0) {
+      let rawKey = process.env.FIREBASE_PRIVATE_KEY || '';
+      let privateKey = '';
+      
+      if (rawKey) {
+        // 0. Check if the user pasted the entire service account JSON
+        try {
+          const parsedJson = JSON.parse(rawKey);
+          if (parsedJson.private_key) {
+            rawKey = parsedJson.private_key;
+          }
+        } catch (e) {
+          // Not JSON, proceed
+        }
+
+        // 1. Remove surrounding quotes
+        rawKey = rawKey.replace(/^["']|["']$/g, '');
+        
+        // 2. Replace literal \n with actual newlines
+        rawKey = rawKey.replace(/\\n/g, '\n');
+        
+        // 3. Extract just the base64 content
+        let base64Data = rawKey;
+        const match = rawKey.match(/-----BEGIN PRIVATE KEY-----([\s\S]*?)-----END PRIVATE KEY-----/);
+        if (match) {
+          base64Data = match[1];
+        } else {
+          // If headers are missing, assume the whole string is the base64 data
+          // But first, let's remove any "PRIVATE KEY" text just in case
+          base64Data = base64Data.replace(/-----BEGIN PRIVATE KEY-----/g, '').replace(/-----END PRIVATE KEY-----/g, '');
+        }
+        
+        // 4. Clean up the base64 data (remove all spaces, newlines, etc)
+        base64Data = base64Data.replace(/\s+/g, '');
+        
+        // 5. Split into 64-character lines
+        const lines = base64Data.match(/.{1,64}/g) || [];
+        
+        // 6. Reconstruct the perfect PEM format
+        privateKey = `-----BEGIN PRIVATE KEY-----\n${lines.join('\n')}\n-----END PRIVATE KEY-----\n`;
+      }
       
       if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !privateKey) {
-        console.warn("⚠️ Firebase Admin credentials missing. Webhook will not be able to update Firestore.");
-        // Initialize with default (will fail on actual DB calls but prevents startup crash)
-        admin.initializeApp();
+        const missing = [];
+        if (!process.env.FIREBASE_PROJECT_ID) missing.push("FIREBASE_PROJECT_ID");
+        if (!process.env.FIREBASE_CLIENT_EMAIL) missing.push("FIREBASE_CLIENT_EMAIL");
+        if (!privateKey) missing.push("FIREBASE_PRIVATE_KEY");
+        
+        const errorMsg = `⚠️ Firebase Admin credentials missing: ${missing.join(", ")}. Webhook and Backup will not work.`;
+        console.error(errorMsg);
+        throw new Error("Configuração do Firebase incompleta no servidor.");
       } else {
-        admin.initializeApp({
-          credential: admin.credential.cert({
-            projectId: process.env.FIREBASE_PROJECT_ID,
-            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            privateKey: privateKey,
-          }),
-        });
+        try {
+          console.log("[Firebase] Attempting to initialize with key starting with:", privateKey.substring(0, 40).replace(/\n/g, '\\n') + "...");
+          
+          admin.initializeApp({
+            credential: admin.credential.cert({
+              projectId: process.env.FIREBASE_PROJECT_ID,
+              clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+              privateKey: privateKey,
+            }),
+          });
+          console.log("[Firebase] Admin initialized successfully.");
+        } catch (initError: any) {
+          console.error("[Firebase] Error initializing admin:", initError);
+          throw new Error(`Erro ao inicializar Firebase Admin: ${initError.message}`);
+        }
       }
     }
     db = admin.firestore();
@@ -109,11 +162,12 @@ async function startServer() {
       try {
         const firestore = getDb();
         const usersSnap = await firestore.collection("users").get();
+        const docs = usersSnap.docs || [];
         const now = new Date();
         let processedCount = 0;
         let emailsSentCount = 0;
 
-        for (const doc of usersSnap.docs) {
+        for (const doc of docs) {
           const userData = doc.data();
           if (!userData.email || !userData.last_activity) continue;
 
@@ -158,36 +212,47 @@ async function startServer() {
         }
 
         res.json({ success: true, processed: processedCount, sent: emailsSentCount });
-      } catch (error) {
+      } catch (error: any) {
         console.error("[Retention] Error processing:", error);
-        res.status(500).json({ error: "Failed to process retention emails" });
+        res.status(500).json({ 
+          error: "Falha ao processar retenção",
+          details: error.message
+        });
       }
     });
 
     // Database Backup Endpoint
     app.get("/api/admin/backup", async (req, res) => {
       try {
+        console.log("[Backup] Starting database backup...");
         const firestore = getDb();
         const collections = ["users", "companies", "events"];
         const backupData: any = {};
 
         for (const colName of collections) {
+          console.log(`[Backup] Fetching collection: ${colName}`);
           const snap = await firestore.collection(colName).get();
-          backupData[colName] = snap.docs.map(doc => ({
+          const docs = snap.docs || [];
+          backupData[colName] = docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           }));
+          console.log(`[Backup] Fetched ${backupData[colName].length} documents from ${colName}`);
         }
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
         const filename = `backup-planeventos-${timestamp}.json`;
 
+        console.log(`[Backup] Backup created successfully. Filename: ${filename}`);
         res.setHeader("Content-Type", "application/json");
         res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
         res.send(JSON.stringify(backupData, null, 2));
-      } catch (error) {
+      } catch (error: any) {
         console.error("[Backup] Error creating backup:", error);
-        res.status(500).json({ error: "Failed to create database backup" });
+        res.status(500).json({ 
+          error: "Falha ao criar backup do banco de dados",
+          details: error.message 
+        });
       }
     });
 

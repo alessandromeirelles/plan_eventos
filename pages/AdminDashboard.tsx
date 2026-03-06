@@ -11,6 +11,9 @@ interface Props {
 const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showRetentionModal, setShowRetentionModal] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [retentionResult, setRetentionResult] = useState<{message: string, isError: boolean} | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -67,25 +70,36 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button 
-            onClick={async () => {
-              if (confirm('Deseja processar os e-mails de retenção para todos os usuários inativos?')) {
-                try {
-                  const res = await fetch('/api/admin/process-retention', { method: 'POST' });
-                  const data = await res.json();
-                  alert(`Processamento concluído!\nUsuários verificados: ${data.processed}\nE-mails enviados: ${data.sent}`);
-                } catch (err) {
-                  alert('Erro ao processar retenção.');
-                }
-              }
-            }}
+            onClick={() => setShowRetentionModal(true)}
             className="flex items-center gap-2 px-3 py-2 bg-brand-cyan text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-105 transition-all shadow-lg shadow-brand-cyan/20"
           >
             <span className="material-symbols-outlined text-sm">mail</span>
             <span className="hidden sm:inline">Processar Retenção</span>
           </button>
           <button 
-            onClick={() => {
-              window.location.href = '/api/admin/backup';
+            onClick={async () => {
+              try {
+                const res = await fetch('/api/admin/backup');
+                if (!res.ok) {
+                  const data = await res.json();
+                  throw new Error(data.error + (data.details ? ': ' + data.details : ''));
+                }
+                
+                // If OK, we need to download the blob
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+                a.download = `backup-planeventos-${timestamp}.json`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+              } catch (err: any) {
+                console.error("Erro no backup:", err);
+                alert(err.message || 'Erro ao criar backup.');
+              }
             }}
             className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-105 transition-all shadow-lg shadow-slate-800/20"
           >
@@ -204,6 +218,95 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
           </div>
         )}
       </div>
+
+      {/* Retention Modal */}
+      {showRetentionModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full flex flex-col items-center text-center shadow-2xl animate-in zoom-in-95 duration-300">
+            {!retentionResult ? (
+              <>
+                <div className="w-20 h-20 bg-brand-cyan/10 text-brand-cyan rounded-full flex items-center justify-center mb-6">
+                  <span className="material-symbols-outlined text-5xl">mail</span>
+                </div>
+                <h3 className="text-xl font-black text-slate-800 dark:text-white mb-2">Processar Retenção?</h3>
+                <p className="text-slate-500 dark:text-slate-400 font-medium mb-8 text-sm">
+                  Deseja processar os e-mails de retenção para todos os usuários inativos?
+                </p>
+                <div className="flex gap-3 w-full">
+                  <button 
+                    onClick={() => setShowRetentionModal(false)}
+                    disabled={isProcessing}
+                    className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-black py-4 rounded-2xl transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      setIsProcessing(true);
+                      try {
+                        const res = await fetch('/api/admin/process-retention', { method: 'POST' });
+                        
+                        const contentType = res.headers.get("content-type");
+                        if (contentType && contentType.indexOf("application/json") !== -1) {
+                          const data = await res.json();
+                          if (!res.ok) {
+                            throw new Error(data.error + (data.details ? ': ' + data.details : ''));
+                          }
+                          setRetentionResult({
+                            isError: false,
+                            message: `Processamento concluído!\nUsuários verificados: ${data.processed}\nE-mails enviados: ${data.sent}`
+                          });
+                        } else {
+                          const text = await res.text();
+                          throw new Error(`Servidor retornou um erro inesperado (${res.status}): ${text.substring(0, 100)}...`);
+                        }
+                      } catch (err: any) {
+                        setRetentionResult({
+                          isError: true,
+                          message: `Erro ao processar retenção: ${err.message}`
+                        });
+                      } finally {
+                        setIsProcessing(false);
+                      }
+                    }}
+                    disabled={isProcessing}
+                    className="flex-1 bg-brand-cyan hover:bg-brand-cyan/90 text-white font-black py-4 rounded-2xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center"
+                  >
+                    {isProcessing ? (
+                      <span className="material-symbols-outlined animate-spin">refresh</span>
+                    ) : (
+                      "Processar"
+                    )}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${retentionResult.isError ? 'bg-red-100 text-red-500 dark:bg-red-900/30' : 'bg-emerald-100 text-emerald-500 dark:bg-emerald-900/30'}`}>
+                  <span className="material-symbols-outlined text-5xl">
+                    {retentionResult.isError ? 'error' : 'check_circle'}
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-slate-800 dark:text-white mb-2">
+                  {retentionResult.isError ? 'Ops!' : 'Sucesso!'}
+                </h3>
+                <p className="text-slate-500 dark:text-slate-400 font-medium mb-8 text-sm whitespace-pre-line">
+                  {retentionResult.message}
+                </p>
+                <button 
+                  onClick={() => {
+                    setShowRetentionModal(false);
+                    setRetentionResult(null);
+                  }}
+                  className="w-full bg-slate-800 dark:bg-slate-700 text-white font-black py-4 rounded-2xl transition-all active:scale-95"
+                >
+                  Entendi
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

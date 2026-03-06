@@ -29,6 +29,46 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
   const [todayEvents, setTodayEvents] = useState<PlanEvent[]>([]);
   const [notifUpcomingEvents, setNotifUpcomingEvents] = useState<PlanEvent[]>([]);
   const [showDailyAlert, setShowDailyAlert] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [showIOSPrompt, setShowIOSPrompt] = useState(false);
+
+  useEffect(() => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    
+    if (isIOS && !isStandalone) {
+      // Show iOS prompt after a short delay
+      const timer = setTimeout(() => setShowIOSPrompt(true), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      // Check if we should show the prompt (e.g., not already installed)
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      if (!isStandalone) {
+        setShowInstallPrompt(true);
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+    }
+    setDeferredPrompt(null);
+    setShowInstallPrompt(false);
+  };
 
   useEffect(() => {
     const today = getTodayString();
@@ -62,7 +102,7 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
             if (Notification.permission === 'granted') {
               new Notification('PlanEventos', {
                 body: `Você tem ${todayFiltered.length} evento(s) hoje!`,
-                icon: '/vite.svg'
+                icon: '/logo.svg'
               });
             }
           }
@@ -265,6 +305,60 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
         </div>
       )}
 
+      {showInstallPrompt && (
+        <div className="fixed bottom-24 left-4 right-4 z-[60] bg-brand-navy text-white p-6 rounded-[32px] shadow-2xl flex items-center justify-between animate-in slide-in-from-bottom-10 duration-500 border border-white/10">
+          <div className="flex items-center gap-4">
+            <div className="size-12 bg-white/10 rounded-2xl flex items-center justify-center">
+              <Logo className="h-6 w-auto" />
+            </div>
+            <div>
+              <p className="text-sm font-black uppercase tracking-tight">Instalar App</p>
+              <p className="text-[10px] font-bold text-slate-300">Acesse mais rápido da tela inicial</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowInstallPrompt(false)}
+              className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400"
+            >
+              Agora Não
+            </button>
+            <button 
+              onClick={handleInstallClick}
+              className="px-6 py-2 bg-brand-orange text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all"
+            >
+              Instalar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showIOSPrompt && (
+        <div className="fixed bottom-24 left-4 right-4 z-[60] bg-white dark:bg-slate-900 text-slate-900 dark:text-white p-6 rounded-[32px] shadow-2xl animate-in slide-in-from-bottom-10 duration-500 border border-slate-100 dark:border-slate-800">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="size-10 bg-brand-navy rounded-xl flex items-center justify-center">
+                <Logo className="h-5 w-auto" />
+              </div>
+              <p className="text-sm font-black uppercase tracking-tight">Instalar no iPhone</p>
+            </div>
+            <button onClick={() => setShowIOSPrompt(false)} className="text-slate-400">
+              <span className="material-symbols-outlined text-xl">close</span>
+            </button>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 text-[11px] font-medium text-slate-600 dark:text-slate-400">
+              <div className="size-6 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center shrink-0">1</div>
+              <p>Toque no botão <span className="material-symbols-outlined text-sm align-middle text-blue-500">ios_share</span> (Compartilhar) abaixo.</p>
+            </div>
+            <div className="flex items-center gap-3 text-[11px] font-medium text-slate-600 dark:text-slate-400">
+              <div className="size-6 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center shrink-0">2</div>
+              <p>Role para baixo e selecione <span className="font-black text-brand-navy dark:text-white">"Adicionar à Tela de Início"</span>.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="sticky top-0 z-50 bg-white dark:bg-background-dark/95 ios-blur px-4 h-16 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 shadow-sm">
         <div className="w-10"></div> 
         <div className="flex items-center justify-center relative">
@@ -428,7 +522,10 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-10">
-          <div className="flex flex-col gap-4 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 shadow-sm relative overflow-hidden">
+          <div 
+            onClick={() => onNavigate('REPORTS')}
+            className="flex flex-col gap-4 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 shadow-sm relative overflow-hidden cursor-pointer active:scale-95 transition-all"
+          >
             <div className="absolute right-4 top-4 text-slate-100 dark:text-slate-800/50">
               <span className="material-symbols-outlined text-5xl">calendar_month</span>
             </div>
@@ -438,7 +535,10 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest relative z-10">Eventos Total</p>
           </div>
-          <div className="flex flex-col gap-4 rounded-3xl border border-orange-50 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 shadow-sm relative overflow-hidden">
+          <div 
+            onClick={() => onNavigate('REPORTS')}
+            className="flex flex-col gap-4 rounded-3xl border border-orange-50 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 shadow-sm relative overflow-hidden cursor-pointer active:scale-95 transition-all"
+          >
             <div className="absolute right-4 top-4 text-orange-50 dark:text-slate-800/50">
               <span className="material-symbols-outlined text-5xl">payments</span>
             </div>
@@ -544,6 +644,15 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
           </div>
         </div>
       </div>
+
+      {/* Floating Action Button */}
+      <button 
+        onClick={() => onNavigate('NEW_EVENT')}
+        className="fixed bottom-24 right-6 z-50 size-14 bg-brand-orange text-white rounded-full shadow-2xl flex items-center justify-center animate-in zoom-in duration-300 hover:scale-110 active:scale-90 transition-all md:hidden"
+        title="Novo Evento"
+      >
+        <span className="material-symbols-outlined text-3xl">add</span>
+      </button>
     </div>
   );
 };

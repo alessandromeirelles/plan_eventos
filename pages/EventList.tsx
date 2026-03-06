@@ -17,9 +17,10 @@ interface Props {
   onStatusChange: (id: string, newStatus: EventStatus) => void;
   onInvoiceStatusChange: (id: string, newStatus: InvoiceStatus) => void;
   showValues: boolean;
+  setShowValues: (show: boolean) => void;
 }
 
-const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, onEdit, onNavigate, onNew, onStatusChange, onInvoiceStatusChange, showValues }) => {
+const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, onEdit, onNavigate, onNew, onStatusChange, onInvoiceStatusChange, showValues, setShowValues }) => {
   const [activeTab, setActiveTab] = useState<'Todos' | EventStatus | 'Empresa'>('Todos');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -86,13 +87,24 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
           <div className="flex items-center gap-3">
             <Logo className="h-8 w-auto" />
           </div>
-          <button 
-            onClick={onNew}
-            className="bg-brand-orange text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm active:scale-95 transition-all flex items-center gap-2"
-          >
-            <span className="material-symbols-outlined text-lg">add</span>
-            Novo Evento
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setShowValues(!showValues)}
+              className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"
+              title={showValues ? "Ocultar Valores" : "Mostrar Valores"}
+            >
+              <span className="material-symbols-outlined text-sm">
+                {showValues ? 'visibility' : 'visibility_off'}
+              </span>
+            </button>
+            <button 
+              onClick={onNew}
+              className="bg-brand-orange text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm active:scale-95 transition-all flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-lg">add</span>
+              Novo Evento
+            </button>
+          </div>
         </div>
         
         <div className="px-4 pb-4 pt-1">
@@ -363,14 +375,14 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
         </div>
       </main>
 
-      <div className="fixed bottom-24 right-4 z-40">
-        <button 
-          onClick={onNew}
-          className="bg-brand-orange text-white h-14 w-14 rounded-full shadow-lg shadow-orange-500/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
-        >
-          <span className="material-symbols-outlined text-3xl">add</span>
-        </button>
-      </div>
+      {/* Floating Action Button (Mobile Only) */}
+      <button 
+        onClick={onNew}
+        className="fixed bottom-24 right-6 z-50 size-14 bg-brand-orange text-white rounded-full shadow-2xl flex items-center justify-center animate-in zoom-in duration-300 hover:scale-110 active:scale-90 transition-all md:hidden"
+        title="Novo Evento"
+      >
+        <span className="material-symbols-outlined text-3xl">add</span>
+      </button>
     </div>
   );
 };
