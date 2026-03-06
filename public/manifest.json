@@ -1,13 +1,11 @@
 {
-  "name": "PlanEventos - Motiva & Comunica",
+  "name": "PlanEventos",
   "short_name": "PlanEventos",
-  "description": "Gestão profissional de eventos e clientes",
+  "description": "Aplicativo para planejamento e gestão de eventos",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#002D56",
+  "background_color": "#ffffff",
   "theme_color": "#002D56",
-  "categories": ["business", "productivity"],
   "icons": [
     {
       "src": "/logo.svg",
