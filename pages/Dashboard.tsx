@@ -397,24 +397,47 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
               <div className="flex flex-col gap-1">
                 {!user?.google_calendar_connected ? (
                   <div className="flex flex-col gap-1">
-                    <span className="text-[8px] font-black text-brand-orange uppercase tracking-widest ml-2 animate-pulse">
-                      ⚠️ Em breve
-                    </span>
                     <button 
-                      disabled
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-400 shadow-none cursor-not-allowed opacity-70"
+                      onClick={handleConnectGoogleCalendar}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-slate-800 border border-brand-orange text-brand-orange shadow-lg hover:bg-brand-orange hover:text-white transition-all active:scale-95"
                     >
-                      <img src="https://www.gstatic.com/images/branding/product/1x/calendar_48dp.png" alt="Google Calendar" className="w-4 h-4 grayscale" />
+                      <img src="https://www.gstatic.com/images/branding/product/1x/calendar_48dp.png" alt="Google Calendar" className="w-4 h-4" />
                       <span className="text-[10px] font-black uppercase tracking-widest">Conectar Agenda</span>
                     </button>
                   </div>
                 ) : (
-                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 text-green-700 shadow-sm">
-                    <div className="relative">
-                      <img src="https://www.gstatic.com/images/branding/product/1x/calendar_48dp.png" alt="Google Calendar" className="w-4 h-4 opacity-50" />
-                      <span className="material-symbols-outlined text-[10px] absolute -top-1 -right-1 bg-green-500 text-white rounded-full">check</span>
+                  <div className="flex flex-col gap-1">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 text-green-700 shadow-sm">
+                      <div className="relative">
+                        <img src="https://www.gstatic.com/images/branding/product/1x/calendar_48dp.png" alt="Google Calendar" className="w-4 h-4 opacity-50" />
+                        <span className="material-symbols-outlined text-[10px] absolute -top-1 -right-1 bg-green-500 text-white rounded-full">check</span>
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest">Agenda Conectada</span>
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest">Agenda Conectada</span>
+                    <button 
+                      onClick={async () => {
+                        if (!user?.uid) return;
+                        try {
+                          const res = await fetch('/api/calendar/sync-all', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userId: user.uid })
+                          });
+                          const data = await res.json();
+                          if (data.success) {
+                            alert(`${data.syncedCount} eventos sincronizados com sucesso!`);
+                          } else {
+                            throw new Error(data.error);
+                          }
+                        } catch (err: any) {
+                          alert('Erro ao sincronizar eventos: ' + err.message);
+                        }
+                      }}
+                      className="mt-1 text-[9px] font-bold text-brand-orange hover:underline flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-xs">sync</span>
+                      Sincronizar eventos existentes
+                    </button>
                   </div>
                 )}
               </div>

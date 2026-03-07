@@ -7,7 +7,7 @@ declare const gapi: any;
 declare const google: any;
 
 // Credenciais oficiais fornecidas pelo usuário
-const CLIENT_ID = '810529146566-3v71cbn992oil13l0vnnjci0kc7cojqj.apps.googleusercontent.com';
+const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '810529146566-3v71cbn992oil13l0vnnjci0kc7cojqj.apps.googleusercontent.com';
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || '';
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';

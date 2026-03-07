@@ -227,6 +227,48 @@ const Settings: React.FC<Props> = ({ user, onUpdateUser, onChangePassword, onNav
           </div>
         </section>
 
+        {/* Notificações */}
+        <section className="space-y-4">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Notificações</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] p-6 shadow-sm border border-slate-100 dark:border-slate-800 space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-black text-brand-navy dark:text-white uppercase">Alertas no Celular</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  {('Notification' in window) 
+                    ? (Notification.permission === 'granted' ? 'Ativadas' : 'Desativadas')
+                    : 'Não suportado neste navegador'}
+                </p>
+              </div>
+              <button 
+                onClick={() => {
+                  if (!('Notification' in window)) {
+                    alert('Seu navegador não suporta notificações.');
+                    return;
+                  }
+                  Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                      new Notification('PlanEventos', {
+                        body: 'Notificações ativadas com sucesso! 🚀',
+                        icon: '/logo.svg'
+                      });
+                    } else {
+                      alert('Permissão de notificação negada. Verifique as configurações do seu navegador.');
+                    }
+                  });
+                }}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${
+                  Notification.permission === 'granted' 
+                    ? 'bg-emerald-100 text-emerald-600' 
+                    : 'bg-brand-orange text-white shadow-lg active:scale-95'
+                }`}
+              >
+                {Notification.permission === 'granted' ? 'Testar' : 'Ativar'}
+              </button>
+            </div>
+          </div>
+        </section>
+
         {/* Assinatura */}
         <section className="space-y-4">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Assinatura & Planos</h3>

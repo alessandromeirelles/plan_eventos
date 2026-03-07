@@ -318,6 +318,78 @@ async function startServer() {
       }
     });
 
+    app.post("/api/calendar/sync-all", async (req, res) => {
+      try {
+        const { userId } = req.body;
+        if (!userId) return res.status(400).json({ error: "Missing userId" });
+
+        const firestore = getDb();
+        const userDoc = await firestore.collection("users").doc(userId).get();
+        if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
+        
+        const userData = userDoc.data();
+        const userEmail = userData?.email;
+        if (!userEmail) return res.status(400).json({ error: "User email not found" });
+
+        const eventsSnap = await firestore.collection("events").where("user_id", "==", userEmail).get();
+        const events = eventsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        const auth = await getGoogleAuthClient(userId);
+        const calendar = google.calendar({ version: 'v3', auth });
+
+        let syncedCount = 0;
+        for (const event of events as any[]) {
+          // Skip if already has google event id (optional: could update instead)
+          if (event.google_calendar_event_id) continue;
+
+          const startTime = event.time || '09:00';
+          const [h, m] = startTime.split(':').map(Number);
+          let endH = h + 1;
+          let endDate = event.date;
+          
+          if (endH >= 24) {
+            endH = 0;
+            const d = new Date(event.date + 'T12:00:00');
+            d.setDate(d.getDate() + 1);
+            endDate = d.toISOString().split('T')[0];
+          }
+          
+          const endTime = `${endH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+
+          const gcalEvent = {
+            summary: event.title,
+            location: event.location || '',
+            description: `Tipo: ${event.type}\nValor: R$ ${event.value}\nStatus: ${event.status}`,
+            start: {
+              dateTime: `${event.date}T${startTime}:00-03:00`,
+              timeZone: 'America/Sao_Paulo',
+            },
+            end: {
+              dateTime: `${endDate}T${endTime}:00-03:00`,
+              timeZone: 'America/Sao_Paulo',
+            }
+          };
+
+          const response = await calendar.events.insert({
+            calendarId: 'primary',
+            requestBody: gcalEvent,
+          });
+
+          if (response.data.id) {
+            await firestore.collection("events").doc(event.id).update({
+              google_calendar_event_id: response.data.id
+            });
+            syncedCount++;
+          }
+        }
+
+        res.json({ success: true, syncedCount });
+      } catch (error: any) {
+        console.error("Error syncing all events:", error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     app.post("/api/calendar/event", async (req, res) => {
       try {
         const { userId, event } = req.body;

@@ -245,14 +245,21 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
                       setIsProcessing(true);
                       try {
                         const res = await fetch('/api/admin/process-retention', { method: 'POST' });
-                        const data = await res.json();
-                        if (!res.ok) {
-                          throw new Error(data.error + (data.details ? ': ' + data.details : ''));
+                        
+                        const contentType = res.headers.get("content-type");
+                        if (contentType && contentType.indexOf("application/json") !== -1) {
+                          const data = await res.json();
+                          if (!res.ok) {
+                            throw new Error(data.error + (data.details ? ': ' + data.details : ''));
+                          }
+                          setRetentionResult({
+                            isError: false,
+                            message: `Processamento concluído!\nUsuários verificados: ${data.processed}\nE-mails enviados: ${data.sent}`
+                          });
+                        } else {
+                          const text = await res.text();
+                          throw new Error(`Servidor retornou um erro inesperado (${res.status}): ${text.substring(0, 100)}...`);
                         }
-                        setRetentionResult({
-                          isError: false,
-                          message: `Processamento concluído!\nUsuários verificados: ${data.processed}\nE-mails enviados: ${data.sent}`
-                        });
                       } catch (err: any) {
                         setRetentionResult({
                           isError: true,

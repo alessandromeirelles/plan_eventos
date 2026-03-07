@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { ViewState, PlanEvent, Company, User, EventStatus, InvoiceStatus } from './types';
 import { auth, db } from './firebaseConfig';
-import { collection, doc, getDocs, setDoc, deleteDoc, query, where, getDoc, updateDoc } from 'firebase/firestore';
-import { onAuthStateChanged, signOut, updateProfile, updatePassword } from 'firebase/auth';
+import { onAuthStateChanged, updatePassword } from 'firebase/auth';
+import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import type { User, PlanEvent, Company, ViewState } from './types';
+import { EventStatus } from './types';
+
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
@@ -11,117 +13,74 @@ import EventList from './pages/EventList';
 import CompanyList from './pages/CompanyList';
 import EventForm from './pages/EventForm';
 import CompanyForm from './pages/CompanyForm';
-import Checkout from './pages/Checkout';
 import Settings from './pages/Settings';
+import Checkout from './pages/Checkout';
 import AdminDashboard from './pages/AdminDashboard';
-import Logo from './components/Logo';
+import Reports from './pages/Reports';
 
-const DEFAULT_EVENT_TYPES = ['Workshop', 'Casamento', 'Corporativo', 'Aniversário', 'Jantar'];
+import { initGoogleScripts } from './googleCalendarService';
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<ViewState>('LANDING');
+  const [user, setUser] = useState<User | null>(null);
   const [events, setEvents] = useState<PlanEvent[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [eventTypes, setEventTypes] = useState<string[]>(DEFAULT_EVENT_TYPES);
-  const [editingEvent, setEditingEvent] = useState<PlanEvent | null>(null);
-  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [eventTypes, setEventTypes] = useState<string[]>(['Reunião', 'Casamento', 'Aniversário', 'Formatura', 'Corporativo']);
+  const [editingEvent, setEditingEvent] = useState<PlanEvent | undefined>();
+  const [editingCompany, setEditingCompany] = useState<Company | undefined>();
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('monthly');
-  const [successPopup, setSuccessPopup] = useState<{show: boolean, message: string}>({show: false, message: ''});
-  const [errorPopup, setErrorPopup] = useState<{show: boolean, message: string}>({show: false, message: ''});
-  const [confirmPopup, setConfirmPopup] = useState<{show: boolean, message: string, onConfirm: () => void}>({show: false, message: '', onConfirm: () => {}});
-  const [showValues, setShowValues] = useState(() => {
-    const saved = localStorage.getItem('showValues');
-    return saved !== null ? JSON.parse(saved) : true;
-  });
+  const [showValues, setShowValues] = useState(true);
+  const [trialDaysLeft, setTrialDaysLeft] = useState(7);
+  const [googleScriptsLoaded, setGoogleScriptsLoaded] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('showValues', JSON.stringify(showValues));
-  }, [showValues]);
+    if (user?.trial_start_date) {
+      const start = new Date(user.trial_start_date);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const left = Math.max(0, 7 - diffDays);
+      setTrialDaysLeft(left);
+    }
+  }, [user?.trial_start_date]);
+
+  useEffect(() => {
+    initGoogleScripts((isInited) => {
+      setGoogleScriptsLoaded(isInited);
+    });
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        try {
-          const userDocRef = doc(db, 'users', firebaseUser.uid);
-          const userDocSnap = await getDoc(userDocRef);
-          
-          let userData: User;
-          if (userDocSnap.exists()) {
-            userData = userDocSnap.data() as User;
-            userData.uid = firebaseUser.uid;
-            // Ensure we have the latest photo/name from auth if missing in firestore
-            userData.photo = userData.photo || firebaseUser.photoURL || '';
-            userData.name = userData.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuário';
-
-            // Check if user is admin
-            if (userData.email === 'admin@admin.com.br' || userData.email.startsWith('alessandromeirelles')) {
-              userData.role = 'admin';
-            }
-
-            // Validate subscription/trial expiry
-            const now = new Date();
-            let isExpired = false;
-
-            if (userData.role !== 'admin') {
-              if (userData.subscription_status === 'active' && userData.subscription_expiry_date) {
-                if (new Date(userData.subscription_expiry_date) < now) {
-                  isExpired = true;
-                }
-              } else if (userData.subscription_status === 'trial' && userData.trial_start_date) {
-                const trialEnd = new Date(userData.trial_start_date);
-                trialEnd.setDate(trialEnd.getDate() + 30);
-                if (trialEnd < now) {
-                  isExpired = true;
-                }
-              }
-            }
-
-            if (isExpired) {
-              userData.subscription_status = 'expired';
-              await setDoc(userDocRef, userData);
-            }
-          } else {
-            userData = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email || '',
-              name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuário',
-              photo: firebaseUser.photoURL || '',
-              bio: '',
-              company_name: '',
-              cnpj: '',
-              subscription_status: 'trial',
-              trial_start_date: firebaseUser.metadata.creationTime || new Date().toISOString()
-            };
-            
-            if (userData.email === 'admin@admin.com.br' || userData.email.startsWith('alessandromeirelles')) {
-              userData.role = 'admin';
-            }
-
-            // Save initial data to Firestore
-            await setDoc(userDocRef, userData);
-          }
-          
-          setUser(userData);
-          if (userData.event_types && userData.event_types.length > 0) {
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as User;
+          setUser({ ...userData, uid: firebaseUser.uid });
+          if (userData.event_types) {
             setEventTypes(userData.event_types);
           }
-          setCurrentView('DASHBOARD');
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-          // Fallback if firestore fails
-          setUser({
+          if (userData.role === 'admin') {
+            setCurrentView('ADMIN_DASHBOARD');
+          } else {
+            setCurrentView('DASHBOARD');
+          }
+        } else {
+          // Create new user
+          const newUser: User = {
+            uid: firebaseUser.uid,
             email: firebaseUser.email || '',
-            name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuário',
+            name: firebaseUser.displayName || 'Usuário',
             photo: firebaseUser.photoURL || '',
-            bio: '',
-            company_name: '',
-            cnpj: '',
             subscription_status: 'trial',
-            trial_start_date: firebaseUser.metadata.creationTime || new Date().toISOString()
-          });
+            trial_start_date: new Date().toISOString(),
+            event_types: ['Reunião', 'Casamento', 'Aniversário', 'Formatura', 'Corporativo'],
+            role: 'user'
+          };
+          await setDoc(userDocRef, newUser);
+          setUser(newUser);
           setCurrentView('DASHBOARD');
         }
       } else {
@@ -134,619 +93,134 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (user && user.uid) {
-      const updateActivity = async () => {
-        const now = new Date().toISOString();
-        const userRef = doc(db, 'users', user.uid!);
-        await updateDoc(userRef, { last_activity: now });
-      };
-      updateActivity();
-      fetchData();
-    }
-  }, [user]);
+    if (!user?.uid) return;
 
-  useEffect(() => {
-    if (user && companies.length > 0) {
-      const companiesWithoutColor = companies.filter(c => !c.color);
-      if (companiesWithoutColor.length > 0) {
-        const colors = ['#fee2e2', '#ffedd5', '#fef3c7', '#dcfce7', '#e0f2fe', '#ede9fe', '#fce7f3', '#f3f4f6'];
-        companiesWithoutColor.forEach(async (c) => {
-          const randomColor = colors[Math.floor(Math.random() * colors.length)];
-          const companyRef = doc(db, 'companies', c.id);
-          await updateDoc(companyRef, { color: randomColor });
-          setCompanies(prev => prev.map(comp => comp.id === c.id ? { ...comp, color: randomColor } : comp));
-        });
-      }
-    }
-  }, [user, companies]);
+    const eventsQuery = query(collection(db, 'events'), where('user_id', '==', user.uid));
+    const unsubscribeEvents = onSnapshot(eventsQuery, (snapshot) => {
+      const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PlanEvent));
+      setEvents(eventsData);
+    });
 
-  const fetchData = async () => {
-    if (!user) return;
-    setLoading(true);
-    setConnectionError(null);
-    try {
-      const eventsRef = collection(db, 'events');
-      const qEvents = query(eventsRef, where("user_id", "==", user.email));
-      const eventsSnap = await getDocs(qEvents);
-      const loadedEvents = eventsSnap.docs.map(doc => doc.data() as PlanEvent);
-      setEvents(loadedEvents);
+    const companiesQuery = query(collection(db, 'companies'), where('user_id', '==', user.uid));
+    const unsubscribeCompanies = onSnapshot(companiesQuery, (snapshot) => {
+      const companiesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
+      setCompanies(companiesData);
+    });
 
-      const companiesRef = collection(db, 'companies');
-      const qCompanies = query(companiesRef, where("user_id", "==", user.email));
-      const companiesSnap = await getDocs(qCompanies);
-      const loadedCompanies = companiesSnap.docs.map(doc => doc.data() as Company);
-      setCompanies(loadedCompanies);
-    } catch (error: any) {
-      setConnectionError("Erro ao carregar dados do Firebase.");
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+    return () => {
+      unsubscribeEvents();
+      unsubscribeCompanies();
+    };
+  }, [user?.uid]);
+
+  const handleNavigate = (view: ViewState) => {
+    setCurrentView(view);
   };
 
-  const getDaysLeft = () => {
-    if (!user) return 0;
-    if (user.role === 'admin') return 9999;
-    
-    const now = new Date();
-    let targetDate: Date;
+  const handleLogin = (loggedInUser: User) => {
+    setUser(loggedInUser);
+    setCurrentView('DASHBOARD');
+  };
 
-    if (user.subscription_status === 'active' && user.subscription_expiry_date) {
-      targetDate = new Date(user.subscription_expiry_date);
-    } else if (user.trial_start_date) {
-      targetDate = new Date(user.trial_start_date);
-      targetDate.setDate(targetDate.getDate() + 30);
-    } else {
-      return 0;
-    }
-
-    const diffTime = targetDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
+  const handleLogout = () => {
+    auth.signOut();
+    setUser(null);
+    setCurrentView('LANDING');
   };
 
   const handleSaveEvent = async (event: PlanEvent) => {
-    setLoading(true);
-    try {
-      if (!user) {
-        setErrorPopup({show: true, message: 'Sessão expirada. Por favor, faça login novamente.'});
-        return;
-      }
-
-      const isNew = !events.some(e => e.id === event.id);
-      const eventId = isNew ? `EV-${Date.now()}` : event.id;
-      const now = new Date().toISOString();
-      
-      const eventData = { 
-        ...event, 
-        id: eventId, 
-        user_id: user.email,
-        updated_at: now
-      };
-
-      if (isNew) {
-        eventData.created_at = now;
-      } else {
-        const existingEvent = events.find(e => e.id === event.id);
-        if (existingEvent?.created_at) {
-          eventData.created_at = existingEvent.created_at;
-        }
-      }
-
-      if (eventData.status === EventStatus.PAID && (!event.paid_at || isNew)) {
-        eventData.paid_at = now;
-      }
-      if (eventData.invoice_status === InvoiceStatus.ISSUED && (!event.invoice_issued_at || isNew)) {
-        eventData.invoice_issued_at = now;
-      }
-      
-      await setDoc(doc(db, 'events', eventId), eventData);
-      
-      if (user.google_calendar_connected) {
-        try {
-          const syncRes = await fetch('/api/calendar/event', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user.uid, event: eventData })
-          });
-          if (syncRes.ok) {
-            const syncData = await syncRes.json();
-            if (syncData.googleEventId && !eventData.google_calendar_event_id) {
-              eventData.google_calendar_event_id = syncData.googleEventId;
-              await setDoc(doc(db, 'events', eventId), eventData);
-            }
-          }
-        } catch (err) {
-          console.error("Failed to sync with Google Calendar", err);
-        }
-      }
-
-      let updatedEvents;
-      if (isNew) {
-        updatedEvents = [...events, eventData];
-      } else {
-        updatedEvents = events.map(e => e.id === event.id ? eventData : e);
-      }
-      setEvents(updatedEvents);
-      
-      setCurrentView('EVENTS');
-      setSuccessPopup({show: true, message: 'Evento salvo com sucesso!'});
-    } catch (error: any) {
-      setErrorPopup({show: true, message: `Erro ao salvar evento: ${error.message || error}`});
-      console.error(error);
-    } finally {
-      setLoading(false);
+    if (!user?.uid) return;
+    
+    const eventData = { ...event, user_id: user.uid };
+    if (event.id) {
+      await updateDoc(doc(db, 'events', event.id), eventData as any);
+    } else {
+      const newDocRef = doc(collection(db, 'events'));
+      await setDoc(newDocRef, { ...eventData, id: newDocRef.id });
     }
+    setCurrentView('EVENTS');
   };
 
-  const handleAddCompany = async (newCompany: Company) => {
-    setLoading(true);
-    try {
-      if (!user) {
-        setErrorPopup({show: true, message: 'Sessão expirada. Por favor, faça login novamente.'});
-        return;
-      }
+  const handleDeleteEvent = async (id: string) => {
+    await deleteDoc(doc(db, 'events', id));
+  };
 
-      const isNew = !newCompany.id || newCompany.id === '';
-      const companyId = isNew ? `CO-${Date.now()}` : newCompany.id;
-      
-      let color = newCompany.color;
-      if (!color) {
-        const colors = ['#fee2e2', '#ffedd5', '#fef3c7', '#dcfce7', '#e0f2fe', '#ede9fe', '#fce7f3', '#f3f4f6'];
-        color = colors[Math.floor(Math.random() * colors.length)];
-      }
+  const handleStatusChange = async (id: string, newStatus: EventStatus) => {
+    await updateDoc(doc(db, 'events', id), { status: newStatus });
+  };
 
-      const companyData = { 
-        ...newCompany, 
-        id: companyId,
-        user_id: user.email,
-        color
-      };
-
-      // Remove undefined fields to avoid Firestore errors
-      Object.keys(companyData).forEach(key => {
-        if ((companyData as any)[key] === undefined) {
-          delete (companyData as any)[key];
-        }
-      });
-
-      await setDoc(doc(db, 'companies', companyId), companyData);
-
-      let updatedCompanies;
-      if (isNew) {
-        updatedCompanies = [...companies, companyData];
-      } else {
-        updatedCompanies = companies.map(c => c.id === newCompany.id ? companyData : c);
-      }
-      setCompanies(updatedCompanies);
-      
-      setCurrentView('COMPANIES');
-      setSuccessPopup({show: true, message: 'Cliente salvo com sucesso!'});
-    } catch (error: any) {
-      console.error("Erro detalhado ao salvar cliente:", error);
-      setErrorPopup({show: true, message: `Erro ao salvar cliente: ${error.message || JSON.stringify(error)}`});
-    } finally {
-      setLoading(false);
+  const handleSaveCompany = async (company: Company) => {
+    if (!user?.uid) return;
+    
+    const companyData = { ...company, user_id: user.uid };
+    if (company.id) {
+      await updateDoc(doc(db, 'companies', company.id), companyData as any);
+    } else {
+      const newDocRef = doc(collection(db, 'companies'));
+      await setDoc(newDocRef, { ...companyData, id: newDocRef.id });
     }
+    setCurrentView('COMPANIES');
+  };
+
+  const handleDeleteCompany = async (id: string) => {
+    await deleteDoc(doc(db, 'companies', id));
   };
 
   const handleUpdateUser = async (updatedUser: User) => {
-    setLoading(true);
+    if (!user?.uid) return false;
     try {
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        const authUpdate: any = { displayName: updatedUser.name };
-        // O Firebase Auth tem limite de tamanho para a photoURL.
-        // Se for base64 (data:image...), não enviamos para o Auth, salvamos apenas no Firestore.
-        if (updatedUser.photo && !updatedUser.photo.startsWith('data:image')) {
-          authUpdate.photoURL = updatedUser.photo;
-        }
-        await updateProfile(currentUser, authUpdate);
-        
-        await setDoc(doc(db, 'users', currentUser.uid), updatedUser);
-      }
-      
+      await updateDoc(doc(db, 'users', user.uid), updatedUser as any);
       setUser(updatedUser);
       return true;
-    } catch (error: any) {
-      setErrorPopup({show: true, message: `Erro ao salvar perfil: ${error.message || error}`});
+    } catch (e) {
       return false;
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleChangePassword = async (newPassword: string) => {
-    setLoading(true);
+    if (!auth.currentUser) return false;
     try {
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        await updatePassword(currentUser, newPassword);
-        setSuccessPopup({show: true, message: 'Senha alterada com sucesso!'});
-        return true;
-      }
+      await updatePassword(auth.currentUser, newPassword);
+      return true;
+    } catch (e) {
       return false;
-    } catch (error: any) {
-      if (error.code === 'auth/requires-recent-login') {
-        setErrorPopup({show: true, message: 'Por motivos de segurança, você precisa sair e fazer login novamente para alterar a senha.'});
-      } else {
-        setErrorPopup({show: true, message: `Erro ao alterar senha: ${error.message || error}`});
-      }
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEventStatusChange = async (id: string, newStatus: EventStatus) => {
-    try {
-      setLoading(true);
-      const eventRef = doc(db, 'events', id);
-      const now = new Date().toISOString();
-      const updateData: any = { status: newStatus, updated_at: now };
-      
-      if (newStatus === EventStatus.PAID) {
-        updateData.paid_at = now;
-      }
-      
-      await updateDoc(eventRef, updateData);
-      
-      const updatedEvents = events.map(e => 
-        e.id === id ? { ...e, ...updateData } : e
-      );
-      setEvents(updatedEvents);
-      setSuccessPopup({show: true, message: 'Status do evento atualizado com sucesso!'});
-    } catch (error: any) {
-      setErrorPopup({show: true, message: `Erro ao atualizar status: ${error.message || error}`});
-      console.error("Erro ao atualizar status:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleInvoiceStatusChange = async (id: string, newStatus: InvoiceStatus) => {
-    try {
-      setLoading(true);
-      const eventRef = doc(db, 'events', id);
-      const now = new Date().toISOString();
-      const updateData: any = { invoice_status: newStatus, updated_at: now };
-      
-      if (newStatus === InvoiceStatus.ISSUED) {
-        updateData.invoice_issued_at = now;
-      }
-      
-      await updateDoc(eventRef, updateData);
-      
-      const updatedEvents = events.map(e => 
-        e.id === id ? { ...e, ...updateData } : e
-      );
-      setEvents(updatedEvents);
-      setSuccessPopup({show: true, message: 'Status da NF atualizado com sucesso!'});
-    } catch (error: any) {
-      setErrorPopup({show: true, message: `Erro ao atualizar status da NF: ${error.message || error}`});
-      console.error("Erro ao atualizar status da NF:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteEvent = async (id: string) => {
-    setConfirmPopup({
-      show: true,
-      message: "Tem certeza que deseja excluir este evento?",
-      onConfirm: async () => {
-        setConfirmPopup({show: false, message: '', onConfirm: () => {}});
-        setLoading(true);
-        try {
-          const eventToDelete = events.find(e => e.id === id);
-          await deleteDoc(doc(db, 'events', id));
-          const updatedEvents = events.filter(e => e.id !== id);
-          setEvents(updatedEvents);
-          
-          if (user?.google_calendar_connected && eventToDelete?.google_calendar_event_id) {
-            try {
-              await fetch('/api/calendar/event', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user.uid, googleEventId: eventToDelete.google_calendar_event_id })
-              });
-            } catch (err) {
-              console.error("Failed to delete from Google Calendar", err);
-            }
-          }
-
-          setSuccessPopup({show: true, message: 'Evento excluído com sucesso!'});
-        } catch (error: any) {
-          setErrorPopup({show: true, message: `Erro ao excluir evento: ${error.message || error}`});
-          console.error("Erro ao excluir:", error);
-        } finally {
-          setLoading(false);
-        }
-      }
-    });
-  };
-
-  const handleDeleteCompany = async (id: string) => {
-    setConfirmPopup({
-      show: true,
-      message: "Tem certeza que deseja excluir este cliente? Isso não excluirá os eventos associados a ele.",
-      onConfirm: async () => {
-        setConfirmPopup({show: false, message: '', onConfirm: () => {}});
-        setLoading(true);
-        try {
-          await deleteDoc(doc(db, 'companies', id));
-          const updatedCompanies = companies.filter(c => c.id !== id);
-          setCompanies(updatedCompanies);
-          setSuccessPopup({show: true, message: 'Cliente excluído com sucesso!'});
-        } catch (error: any) {
-          setErrorPopup({show: true, message: `Erro ao excluir cliente: ${error.message || error}`});
-          console.error("Erro ao excluir:", error);
-        } finally {
-          setLoading(false);
-        }
-      }
-    });
-  };
-
-  const handleLogin = (u: User) => {
-    if (u.email === 'admin@admin.com.br' || u.email.startsWith('alessandromeirelles')) {
-      u.role = 'admin';
-    }
-    setUser(u);
-    setCurrentView('DASHBOARD');
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setUser(null);
-      setCurrentView('LANDING');
-    } catch (error) {
-      console.error("Erro ao sair:", error);
-    }
-  };
-
-  const handleUpdateEventTypes = async (newTypes: string[]) => {
-    setEventTypes(newTypes);
-    if (user && auth.currentUser) {
-      try {
-        const userDocRef = doc(db, 'users', auth.currentUser.uid);
-        await setDoc(userDocRef, { ...user, event_types: newTypes });
-        setUser({ ...user, event_types: newTypes });
-      } catch (error) {
-        console.error("Error saving event types:", error);
-      }
-    }
-  };
-
-  const handleSubscriptionSuccess = async (planType: 'monthly' | 'yearly') => {
-    if (!user || !auth.currentUser) return;
-
-    const now = new Date();
-    const expiryDate = new Date();
-    if (planType === 'monthly') {
-      expiryDate.setMonth(now.getMonth() + 1);
-    } else {
-      expiryDate.setFullYear(now.getFullYear() + 1);
-    }
-
-    const updatedUser: User = {
-      ...user,
-      subscription_status: 'active',
-      plan_type: planType,
-      subscription_expiry_date: expiryDate.toISOString()
-    };
-
-    try {
-      const userDocRef = doc(db, 'users', auth.currentUser.uid);
-      await setDoc(userDocRef, updatedUser);
-      setUser(updatedUser);
-      setCurrentView('DASHBOARD');
-      setSuccessPopup({show: true, message: `Assinatura ${planType === 'monthly' ? 'Mensal' : 'Anual'} ativada com sucesso!`});
-    } catch (error: any) {
-      setErrorPopup({show: true, message: `Erro ao ativar assinatura: ${error.message}`});
     }
   };
 
   const renderView = () => {
-    if (!user && currentView !== 'LANDING' && currentView !== 'AUTH') return <Landing onNavigate={setCurrentView} />;
-    
     switch (currentView) {
-      case 'LANDING': return <Landing onNavigate={setCurrentView} />;
-      case 'AUTH': return <Auth onLogin={handleLogin} onCancel={() => setCurrentView('LANDING')} />;
-      case 'DASHBOARD': return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getDaysLeft()} user={user} showValues={showValues} setShowValues={setShowValues} />;
-      case 'EVENTS': return <EventList events={events} companies={companies} eventTypes={eventTypes} onDelete={handleDeleteEvent} onStatusChange={handleEventStatusChange} onInvoiceStatusChange={handleInvoiceStatusChange} onEdit={(e) => { setEditingEvent(e); setCurrentView('EDIT_EVENT'); }} onNavigate={setCurrentView} onNew={() => { setEditingEvent(null); setCurrentView('NEW_EVENT'); }} showValues={showValues} setShowValues={setShowValues} />;
-      case 'COMPANIES': return <CompanyList companies={companies} events={events} onDelete={handleDeleteCompany} onNavigate={setCurrentView} onNew={() => { setEditingCompany(null); setCurrentView('NEW_COMPANY'); }} onEdit={(c) => { setEditingCompany(c); setCurrentView('EDIT_COMPANY'); }} />;
+      case 'LANDING':
+        return <Landing onNavigate={handleNavigate} />;
+      case 'AUTH':
+        return <Auth onLogin={handleLogin} onCancel={() => handleNavigate('LANDING')} />;
+      case 'DASHBOARD':
+        return <Dashboard events={events} companies={companies} onNavigate={handleNavigate} trialDaysLeft={trialDaysLeft} user={user} showValues={showValues} setShowValues={setShowValues} />;
+      case 'EVENTS':
+        return <EventList events={events} companies={companies} eventTypes={eventTypes} onDelete={handleDeleteEvent} onEdit={(e) => { setEditingEvent(e); handleNavigate('EDIT_EVENT'); }} onNavigate={handleNavigate} onNew={() => { setEditingEvent(undefined); handleNavigate('NEW_EVENT'); }} onStatusChange={handleStatusChange} />;
+      case 'COMPANIES':
+        return <CompanyList companies={companies} events={events} onNavigate={handleNavigate} onNew={() => { setEditingCompany(undefined); handleNavigate('NEW_COMPANY'); }} onEdit={(c) => { setEditingCompany(c); handleNavigate('EDIT_COMPANY'); }} onDelete={handleDeleteCompany} />;
       case 'NEW_EVENT':
-      case 'EDIT_EVENT': return <EventForm companies={companies} eventTypes={eventTypes} onUpdateEventTypes={handleUpdateEventTypes} initialData={editingEvent || undefined} onSave={handleSaveEvent} onCancel={() => { setEditingEvent(null); setCurrentView('EVENTS'); }} onNewCompany={() => setCurrentView('NEW_COMPANY')} />;
+      case 'EDIT_EVENT':
+        return <EventForm companies={companies} eventTypes={eventTypes} onUpdateEventTypes={async (types) => { setEventTypes(types); if (user?.uid) await updateDoc(doc(db, 'users', user.uid), { event_types: types }); }} initialData={editingEvent} onSave={handleSaveEvent} onCancel={() => handleNavigate('EVENTS')} onNewCompany={() => handleNavigate('NEW_COMPANY')} />;
       case 'NEW_COMPANY':
-      case 'EDIT_COMPANY': return <CompanyForm initialData={editingCompany || undefined} onSave={handleAddCompany} onCancel={() => { setEditingCompany(null); setCurrentView('COMPANIES'); }} />;
+      case 'EDIT_COMPANY':
+        return <CompanyForm initialData={editingCompany} onSave={handleSaveCompany} onCancel={() => handleNavigate('COMPANIES')} />;
       case 'SETTINGS':
-        return user ? (
-          <Settings 
-            user={user} 
-            onUpdateUser={handleUpdateUser} 
-            onChangePassword={handleChangePassword}
-            onNavigate={setCurrentView}
-            onSelectPlan={setSelectedPlan}
-            onLogout={handleLogout} 
-            onShowSuccess={(message) => setSuccessPopup({show: true, message})}
-          />
-        ) : null;
-      case 'CHECKOUT': return <Checkout plan={selectedPlan} userId={auth.currentUser?.uid || ''} onSuccess={handleSubscriptionSuccess} onCancel={() => setCurrentView('DASHBOARD')} />;
-      case 'ADMIN_DASHBOARD': return <AdminDashboard onLogout={handleLogout} onNavigate={setCurrentView} />;
-      default: return <Dashboard events={events} companies={companies} onNavigate={setCurrentView} trialDaysLeft={getDaysLeft()} user={user} />;
+        return <Settings user={user!} onUpdateUser={handleUpdateUser} onChangePassword={handleChangePassword} onNavigate={handleNavigate} onSelectPlan={(plan) => { setSelectedPlan(plan); handleNavigate('CHECKOUT'); }} onLogout={handleLogout} onShowSuccess={(msg) => alert(msg)} />;
+      case 'CHECKOUT':
+        return <Checkout plan={selectedPlan} userId={user?.uid || ''} onSuccess={() => handleNavigate('DASHBOARD')} onCancel={() => handleNavigate('SETTINGS')} />;
+      case 'ADMIN_DASHBOARD':
+        return <AdminDashboard onLogout={handleLogout} onNavigate={handleNavigate} />;
+      case 'REPORTS':
+        return <Reports events={events} onNavigate={handleNavigate} showValues={showValues} setShowValues={setShowValues} />;
+      default:
+        return <Landing onNavigate={handleNavigate} />;
     }
   };
 
-  const showNavbar = user && !['LANDING', 'AUTH', 'CHECKOUT', 'NEW_EVENT', 'EDIT_EVENT', 'NEW_COMPANY', 'EDIT_COMPANY', 'ADMIN_DASHBOARD'].includes(currentView);
-
   return (
-    <div className={`min-h-screen bg-background-light dark:bg-background-dark relative overflow-x-hidden max-w-[430px] md:max-w-none mx-auto shadow-2xl md:shadow-none border-x border-primary/10 md:border-none ${showNavbar ? 'md:pl-64' : ''}`}>
-      {connectionError && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-[380px] bg-red-600 text-white p-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top duration-300">
-          <span className="material-symbols-outlined">cloud_off</span>
-          <div className="flex-1">
-            <p className="text-xs font-black uppercase tracking-widest">Erro de Conexão</p>
-            <p className="text-[10px] font-bold opacity-90 leading-tight">{connectionError}</p>
-            <button 
-              onClick={() => {
-                document.cookie.split(";").forEach(c => {
-                  document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-                });
-                window.location.reload();
-              }}
-              className="mt-1 text-[9px] underline font-bold opacity-80 hover:opacity-100"
-            >
-              Limpar Cookies e Recarregar
-            </button>
-          </div>
-          <button onClick={() => setConnectionError(null)} className="p-1 hover:bg-white/10 rounded-full">
-            <span className="material-symbols-outlined text-sm">close</span>
-          </button>
-        </div>
-      )}
-
-      {successPopup.show && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full flex flex-col items-center text-center shadow-2xl animate-in zoom-in-95 duration-300">
-            <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500 rounded-full flex items-center justify-center mb-6">
-              <span className="material-symbols-outlined text-5xl">check_circle</span>
-            </div>
-            <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Sucesso!</h3>
-            <p className="text-slate-500 dark:text-slate-400 font-medium mb-8">{successPopup.message}</p>
-            <button 
-              onClick={() => setSuccessPopup({show: false, message: ''})}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl transition-all active:scale-95"
-            >
-              OK, Continuar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {errorPopup.show && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full flex flex-col items-center text-center shadow-2xl animate-in zoom-in-95 duration-300">
-            <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mb-6">
-              <span className="material-symbols-outlined text-5xl">error</span>
-            </div>
-            <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Ops!</h3>
-            <p className="text-slate-500 dark:text-slate-400 font-medium mb-8 text-sm">{errorPopup.message}</p>
-            <button 
-              onClick={() => setErrorPopup({show: false, message: ''})}
-              className="w-full bg-slate-800 dark:bg-slate-700 text-white font-black py-4 rounded-2xl transition-all active:scale-95"
-            >
-              Entendi
-            </button>
-          </div>
-        </div>
-      )}
-
-      {confirmPopup.show && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full flex flex-col items-center text-center shadow-2xl animate-in zoom-in-95 duration-300">
-            <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mb-6">
-              <span className="material-symbols-outlined text-5xl">warning</span>
-            </div>
-            <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Atenção</h3>
-            <p className="text-slate-500 dark:text-slate-400 font-medium mb-8 text-sm">{confirmPopup.message}</p>
-            <div className="flex gap-3 w-full">
-              <button 
-                onClick={() => setConfirmPopup({show: false, message: '', onConfirm: () => {}})}
-                className="flex-1 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-black py-4 rounded-2xl transition-all active:scale-95"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={confirmPopup.onConfirm}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white font-black py-4 rounded-2xl transition-all active:scale-95"
-              >
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+    <div className="app-container">
       {renderView()}
-      
-      <footer className="w-full text-center py-6 text-xs text-slate-400 dark:text-slate-500 font-medium pb-28 md:pb-6 flex flex-col gap-1">
-        <span>Desenvolvido por Motiva & Comunica - 2026</span>
-        <span className="text-[10px] opacity-70">v1.2.1</span>
-      </footer>
-
-      {showNavbar && (
-        <>
-          {/* Mobile Bottom Nav */}
-          <nav className="md:hidden fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-full max-w-[430px] bg-white/90 dark:bg-background-dark/90 ios-blur border-t border-primary/10 px-6 pt-3 pb-8 flex justify-between items-center">
-            <button onClick={() => setCurrentView('DASHBOARD')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'DASHBOARD' ? 'text-primary' : 'text-slate-400'}`}>
-              <span className="material-symbols-outlined text-[28px]">dashboard</span>
-              <span className="text-[10px] font-bold">Início</span>
-            </button>
-            <button onClick={() => setCurrentView('COMPANIES')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'COMPANIES' ? 'text-primary' : 'text-slate-400'}`}>
-              <span className="material-symbols-outlined text-[28px]">corporate_fare</span>
-              <span className="text-[10px] font-bold">Clientes</span>
-            </button>
-            <button onClick={() => setCurrentView('EVENTS')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'EVENTS' ? 'text-primary' : 'text-slate-400'}`}>
-              <span className="material-symbols-outlined text-[28px]">calendar_month</span>
-              <span className="text-[10px] font-bold">Eventos</span>
-            </button>
-            <button onClick={() => setCurrentView('SETTINGS')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'SETTINGS' ? 'text-primary' : 'text-slate-400'}`}>
-              <span className="material-symbols-outlined text-[28px]">settings</span>
-              <span className="text-[10px] font-bold">Perfil</span>
-            </button>
-            {user?.role === 'admin' && (
-              <button onClick={() => setCurrentView('ADMIN_DASHBOARD')} className={`flex flex-col items-center transition-all active:scale-90 ${currentView === 'ADMIN_DASHBOARD' ? 'text-primary' : 'text-slate-400'}`}>
-                <span className="material-symbols-outlined text-[28px]">admin_panel_settings</span>
-                <span className="text-[10px] font-bold">Admin</span>
-              </button>
-            )}
-          </nav>
-
-          {/* Desktop Sidebar */}
-          <nav className="hidden md:flex flex-col fixed top-0 left-0 h-screen w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-40 p-6 shadow-xl">
-            <div className="flex items-center gap-3 mb-12">
-              <Logo className="h-12 w-auto" />
-            </div>
-            
-            <div className="flex flex-col gap-2 flex-1">
-              <button onClick={() => setCurrentView('DASHBOARD')} className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${currentView === 'DASHBOARD' ? 'bg-primary/10 text-primary font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'}`}>
-                <span className="material-symbols-outlined">dashboard</span>
-                <span>Início</span>
-              </button>
-              <button onClick={() => setCurrentView('COMPANIES')} className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${currentView === 'COMPANIES' ? 'bg-primary/10 text-primary font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'}`}>
-                <span className="material-symbols-outlined">corporate_fare</span>
-                <span>Clientes</span>
-              </button>
-              <button onClick={() => setCurrentView('EVENTS')} className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${currentView === 'EVENTS' ? 'bg-primary/10 text-primary font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'}`}>
-                <span className="material-symbols-outlined">calendar_month</span>
-                <span>Eventos</span>
-              </button>
-              <button onClick={() => setCurrentView('SETTINGS')} className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${currentView === 'SETTINGS' ? 'bg-primary/10 text-primary font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'}`}>
-                <span className="material-symbols-outlined">settings</span>
-                <span>Perfil</span>
-              </button>
-              {user?.role === 'admin' && (
-                <button onClick={() => setCurrentView('ADMIN_DASHBOARD')} className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${currentView === 'ADMIN_DASHBOARD' ? 'bg-primary/10 text-primary font-bold' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'}`}>
-                  <span className="material-symbols-outlined">admin_panel_settings</span>
-                  <span>Admin</span>
-                </button>
-              )}
-            </div>
-            
-            {user && (
-              <div className="mt-auto pt-6 border-t border-slate-200 dark:border-slate-800 flex items-center gap-3">
-                <img src={user.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=F47920&color=fff`} alt="Profile" className="w-10 h-10 rounded-full object-cover border-2 border-slate-200 dark:border-slate-700" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800 dark:text-white truncate">{user.name}</p>
-                  <p className="text-xs text-slate-500 truncate">{user.email}</p>
-                </div>
-              </div>
-            )}
-          </nav>
-        </>
-      )}
     </div>
   );
 };
