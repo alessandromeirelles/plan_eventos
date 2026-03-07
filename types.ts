@@ -45,7 +45,7 @@ export interface PlanEvent {
   google_calendar_event_id?: string;
 }
 
-export type ViewState = 'LANDING' | 'AUTH' | 'DASHBOARD' | 'EVENTS' | 'COMPANIES' | 'NEW_EVENT' | 'EDIT_EVENT' | 'NEW_COMPANY' | 'EDIT_COMPANY' | 'SETTINGS' | 'SUBSCRIPTION' | 'CHECKOUT' | 'ADMIN_DASHBOARD' | 'REPORTS';
+export type ViewState = 'LANDING' | 'AUTH' | 'DASHBOARD' | 'EVENTS' | 'COMPANIES' | 'NEW_EVENT' | 'EDIT_EVENT' | 'NEW_COMPANY' | 'EDIT_COMPANY' | 'SETTINGS' | 'SUBSCRIPTION' | 'CHECKOUT' | 'ADMIN_DASHBOARD';
 
 export interface User {
   uid?: string;

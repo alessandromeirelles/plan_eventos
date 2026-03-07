@@ -16,46 +16,7 @@ function getDb() {
   if (!db) {
     const apps = admin.apps || [];
     if (apps.length === 0) {
-      let rawKey = process.env.FIREBASE_PRIVATE_KEY || '';
-      let privateKey = '';
-      
-      if (rawKey) {
-        // 0. Check if the user pasted the entire service account JSON
-        try {
-          const parsedJson = JSON.parse(rawKey);
-          if (parsedJson.private_key) {
-            rawKey = parsedJson.private_key;
-          }
-        } catch (e) {
-          // Not JSON, proceed
-        }
-
-        // 1. Remove surrounding quotes
-        rawKey = rawKey.replace(/^["']|["']$/g, '');
-        
-        // 2. Replace literal \n with actual newlines
-        rawKey = rawKey.replace(/\\n/g, '\n');
-        
-        // 3. Extract just the base64 content
-        let base64Data = rawKey;
-        const match = rawKey.match(/-----BEGIN PRIVATE KEY-----([\s\S]*?)-----END PRIVATE KEY-----/);
-        if (match) {
-          base64Data = match[1];
-        } else {
-          // If headers are missing, assume the whole string is the base64 data
-          // But first, let's remove any "PRIVATE KEY" text just in case
-          base64Data = base64Data.replace(/-----BEGIN PRIVATE KEY-----/g, '').replace(/-----END PRIVATE KEY-----/g, '');
-        }
-        
-        // 4. Clean up the base64 data (remove all spaces, newlines, etc)
-        base64Data = base64Data.replace(/\s+/g, '');
-        
-        // 5. Split into 64-character lines
-        const lines = base64Data.match(/.{1,64}/g) || [];
-        
-        // 6. Reconstruct the perfect PEM format
-        privateKey = `-----BEGIN PRIVATE KEY-----\n${lines.join('\n')}\n-----END PRIVATE KEY-----\n`;
-      }
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n').trim().replace(/^["']|["']$/g, '');
       
       if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !privateKey) {
         const missing = [];
@@ -68,8 +29,6 @@ function getDb() {
         throw new Error("Configuração do Firebase incompleta no servidor.");
       } else {
         try {
-          console.log("[Firebase] Attempting to initialize with key starting with:", privateKey.substring(0, 40).replace(/\n/g, '\\n') + "...");
-          
           admin.initializeApp({
             credential: admin.credential.cert({
               projectId: process.env.FIREBASE_PROJECT_ID,

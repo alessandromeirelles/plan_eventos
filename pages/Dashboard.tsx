@@ -428,10 +428,7 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-10">
-          <div 
-            onClick={() => onNavigate('REPORTS')}
-            className="flex flex-col gap-4 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 shadow-sm relative overflow-hidden cursor-pointer active:scale-95 transition-all"
-          >
+          <div className="flex flex-col gap-4 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 shadow-sm relative overflow-hidden">
             <div className="absolute right-4 top-4 text-slate-100 dark:text-slate-800/50">
               <span className="material-symbols-outlined text-5xl">calendar_month</span>
             </div>
@@ -441,10 +438,7 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest relative z-10">Eventos Total</p>
           </div>
-          <div 
-            onClick={() => onNavigate('REPORTS')}
-            className="flex flex-col gap-4 rounded-3xl border border-orange-50 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 shadow-sm relative overflow-hidden cursor-pointer active:scale-95 transition-all"
-          >
+          <div className="flex flex-col gap-4 rounded-3xl border border-orange-50 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 shadow-sm relative overflow-hidden">
             <div className="absolute right-4 top-4 text-orange-50 dark:text-slate-800/50">
               <span className="material-symbols-outlined text-5xl">payments</span>
             </div>
