@@ -284,10 +284,25 @@ async function startServer() {
 
         // Save tokens to Firestore
         const firestore = getDb();
-        await firestore.collection("users").doc(userId).update({
-          google_calendar_tokens: tokens,
-          google_calendar_connected: true,
-        });
+        const userRef = firestore.collection("users").doc(userId);
+        const userDoc = await userRef.get();
+        
+        if (!userDoc.exists) {
+          console.log(`[Google Auth] User document ${userId} not found, creating it.`);
+          await userRef.set({
+            uid: userId,
+            google_calendar_tokens: tokens,
+            google_calendar_connected: true,
+            updated_at: new Date().toISOString()
+          });
+        } else {
+          console.log(`[Google Auth] Updating user document ${userId} with tokens.`);
+          await userRef.update({
+            google_calendar_tokens: tokens,
+            google_calendar_connected: true,
+            updated_at: new Date().toISOString()
+          });
+        }
 
         res.send(`
           <html><body>
@@ -315,6 +330,25 @@ async function startServer() {
             <p>Erro ao processar autenticação.</p>
           </body></html>
         `);
+      }
+    });
+
+    // Diagnostic endpoint
+    app.get("/api/diag", async (req, res) => {
+      try {
+        const firestore = getDb();
+        const testDoc = await firestore.collection("diag").doc("test").get();
+        res.json({
+          status: "ok",
+          firebase: "connected",
+          env: {
+            GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? "SET" : "NOT SET",
+            GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ? "SET" : "NOT SET",
+            FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
+          }
+        });
+      } catch (err: any) {
+        res.status(500).json({ status: "error", message: err.message });
       }
     });
 

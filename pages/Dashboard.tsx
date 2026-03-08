@@ -183,10 +183,13 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
     try {
       const origin = window.location.origin;
       const redirectUri = `${origin}/api/auth/google/callback`;
-      console.log('[Google Auth] Using redirectUri:', redirectUri);
+      console.log('[Google Auth] Initiating connection', { userId: user.uid, redirectUri });
       
       const response = await fetch(`/api/auth/google/url?userId=${user.uid}&redirectUri=${encodeURIComponent(redirectUri)}`);
-      if (!response.ok) throw new Error('Failed to get auth URL');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get auth URL');
+      }
       
       const { url } = await response.json();
       
@@ -199,9 +202,9 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
       if (!authWindow) {
         alert('Por favor, permita popups para conectar sua agenda do Google.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error connecting to Google Calendar:', error);
-      alert('Erro ao iniciar conexão com o Google Calendar.');
+      alert(`Erro ao iniciar conexão: ${error.message}\n\nCertifique-se de que o GOOGLE_CLIENT_ID está configurado no servidor.`);
     }
   };
 
@@ -212,10 +215,16 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
         return;
       }
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        alert('Google Calendar conectado com sucesso! Recarregue a página para atualizar o status.');
+        alert('Google Calendar conectado com sucesso!');
         window.location.reload();
       } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
-        alert(`Erro na conexão: ${event.data.error}`);
+        const errorMsg = event.data.error || 'Erro desconhecido';
+        console.error('[Google Auth] Error from popup:', errorMsg);
+        if (errorMsg.includes('redirect_uri_mismatch')) {
+          alert('Erro de Configuração (redirect_uri_mismatch):\nA URL de redirecionamento não está autorizada no Console do Google Cloud.\n\nPor favor, adicione esta URL aos "URIs de redirecionamento autorizados":\n' + window.location.origin + '/api/auth/google/callback');
+        } else {
+          alert(`Erro na conexão: ${errorMsg}`);
+        }
       }
     };
     window.addEventListener('message', handleMessage);

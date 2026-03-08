@@ -93,15 +93,15 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.email) return;
 
-    const eventsQuery = query(collection(db, 'events'), where('user_id', '==', user.uid));
+    const eventsQuery = query(collection(db, 'events'), where('user_id', '==', user.email));
     const unsubscribeEvents = onSnapshot(eventsQuery, (snapshot) => {
       const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PlanEvent));
       setEvents(eventsData);
     });
 
-    const companiesQuery = query(collection(db, 'companies'), where('user_id', '==', user.uid));
+    const companiesQuery = query(collection(db, 'companies'), where('user_id', '==', user.email));
     const unsubscribeCompanies = onSnapshot(companiesQuery, (snapshot) => {
       const companiesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
       setCompanies(companiesData);
@@ -111,7 +111,7 @@ const App: React.FC = () => {
       unsubscribeEvents();
       unsubscribeCompanies();
     };
-  }, [user?.uid]);
+  }, [user?.email]);
 
   const handleNavigate = (view: ViewState) => {
     setCurrentView(view);
@@ -129,9 +129,9 @@ const App: React.FC = () => {
   };
 
   const handleSaveEvent = async (event: PlanEvent) => {
-    if (!user?.uid) return;
+    if (!user?.email) return;
     
-    const eventData = { ...event, user_id: user.uid };
+    const eventData = { ...event, user_id: user.email };
     if (event.id) {
       await updateDoc(doc(db, 'events', event.id), eventData as any);
     } else {
@@ -150,9 +150,9 @@ const App: React.FC = () => {
   };
 
   const handleSaveCompany = async (company: Company) => {
-    if (!user?.uid) return;
+    if (!user?.email) return;
     
-    const companyData = { ...company, user_id: user.uid };
+    const companyData = { ...company, user_id: user.email };
     if (company.id) {
       await updateDoc(doc(db, 'companies', company.id), companyData as any);
     } else {

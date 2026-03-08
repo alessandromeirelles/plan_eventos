@@ -329,6 +329,42 @@ const Settings: React.FC<Props> = ({ user, onUpdateUser, onChangePassword, onNav
           </div>
         </section>
 
+        {/* Status do Sistema */}
+        <section className="space-y-4">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Status do Sistema</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] p-6 shadow-sm border border-slate-100 dark:border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-black text-brand-navy dark:text-white uppercase">Conexão Firebase</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Verificando...</p>
+              </div>
+              <button 
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/diag');
+                    const data = await res.json();
+                    alert(`Status: ${data.status}\nFirebase: ${data.firebase}\nGoogle Client ID: ${data.env.GOOGLE_CLIENT_ID}`);
+                  } catch (e) {
+                    alert('Erro ao verificar status do servidor.');
+                  }
+                }}
+                className="bg-slate-100 dark:bg-slate-800 text-slate-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase"
+              >
+                Verificar
+              </button>
+            </div>
+            <div className="pt-4 border-t border-slate-50 dark:border-slate-800">
+              <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">URL de Redirecionamento (Google):</p>
+              <code className="block p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-[10px] break-all text-brand-navy dark:text-brand-orange font-mono">
+                {window.location.origin}/api/auth/google/callback
+              </code>
+              <p className="text-[9px] text-slate-400 mt-2 italic">
+                * Adicione esta URL no Console do Google Cloud se encontrar erro 400.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Ações */}
         <section className="space-y-3 pt-4">
           <button 

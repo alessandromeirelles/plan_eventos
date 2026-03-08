@@ -24,6 +24,13 @@ export const getErrorMessage = (error: any) => {
   if (code === 'auth/weak-password') return 'A senha deve ter pelo menos 6 caracteres.';
   if (code === 'auth/user-not-found') return 'Usuário não encontrado.';
   if (code === 'auth/wrong-password') return 'Senha incorreta.';
-  if (code === 'auth/network-request-failed') return 'Erro de conexão. Se estiver usando o modo de visualização, abra o app em uma nova guia ou desative o bloqueador de anúncios/rastreamento do navegador.';
+  if (code === 'auth/unauthorized-domain') {
+    const domain = window.location.hostname;
+    return `Domínio não autorizado. Adicione ${domain} aos domínios autorizados no Console do Firebase (Authentication > Settings > Authorized domains).`;
+  }
+  if (code === 'auth/network-request-failed') {
+    const domain = window.location.hostname;
+    return `Erro de conexão. Verifique se o domínio ${domain} está autorizado no Console do Firebase. Se estiver usando o modo de visualização, abra o app em uma nova guia.`;
+  }
   return error?.message || 'Erro ao conectar com o servidor.';
 };
