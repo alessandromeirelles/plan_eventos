@@ -17,6 +17,7 @@ import Settings from './pages/Settings';
 import Checkout from './pages/Checkout';
 import AdminDashboard from './pages/AdminDashboard';
 import Reports from './pages/Reports';
+import Navigation from './components/Navigation';
 
 import { initGoogleScripts } from './googleCalendarService';
 
@@ -221,6 +222,9 @@ const App: React.FC = () => {
   return (
     <div className="app-container">
       {renderView()}
+      {user && currentView !== 'LANDING' && currentView !== 'AUTH' && (
+        <Navigation currentView={currentView} onNavigate={handleNavigate} user={user} />
+      )}
     </div>
   );
 };

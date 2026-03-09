@@ -25,6 +25,12 @@ export interface Company {
   color?: string;
 }
 
+export interface Expense {
+  id: string;
+  type: string;
+  value: number;
+}
+
 export interface PlanEvent {
   id: string;
   title: string;
@@ -35,6 +41,7 @@ export interface PlanEvent {
   company_id: string;
   status: EventStatus;
   value: number;
+  expenses?: Expense[];
   invoice_status?: InvoiceStatus;
   invoice_number?: string;
   user_id?: string;

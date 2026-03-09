@@ -491,6 +491,7 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
           </div>
           {upcomingEvents.slice(0, 4).map((event) => {
             const logoUrl = getCompanyLogo(event.company_id);
+            const totalExpenses = (event.expenses || []).reduce((acc, exp) => acc + (exp.value || 0), 0);
             return (
               <div key={event.id} onClick={() => onNavigate('EVENTS')} className="flex items-center gap-4 p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-50 dark:border-slate-800 shadow-sm cursor-pointer group hover:border-brand-orange/30 transition-all">
                 <div className="size-16 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center overflow-hidden border border-slate-100 dark:border-slate-700">
@@ -503,6 +504,11 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
                     <span className="text-[10px] font-black text-brand-orange">
                       {showValues ? `R$ ${event.value.toLocaleString('pt-BR')}` : 'R$ •••'}
                     </span>
+                    {totalExpenses > 0 && (
+                      <span className="text-[10px] font-black text-red-500" title="Total de Despesas">
+                        {showValues ? `- R$ ${totalExpenses.toLocaleString('pt-BR')}` : '- R$ •••'}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 mt-1.5 text-slate-500">
                     <span className="material-symbols-outlined text-[10px]">calendar_month</span>

@@ -1,8 +1,18 @@
 
 import React, { useState } from 'react';
 import { EventStatus, InvoiceStatus } from '../types';
-import type { Company, PlanEvent } from '../types';
+import type { Company, PlanEvent, Expense } from '../types';
 import { getTodayString } from '../utils';
+
+const EXPENSE_TYPES = [
+  'Alimentação',
+  'Transporte',
+  'Hospedagem',
+  'Equipamentos',
+  'Terceiros',
+  'Impostos',
+  'Outros'
+];
 
 interface Props {
   companies: Company[];
@@ -27,10 +37,37 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
     company_id: initialData?.company_id || (companies[0]?.id || ''),
     status: initialData?.status || EventStatus.PENDING,
     value: initialData?.value || 0,
+    expenses: initialData?.expenses || [],
     location: initialData?.location || '',
     invoice_status: initialData?.invoice_status || InvoiceStatus.PENDING,
     invoice_number: initialData?.invoice_number || ''
   });
+
+  const handleAddExpense = () => {
+    setFormData({
+      ...formData,
+      expenses: [
+        ...formData.expenses,
+        { id: 'EXP-' + Math.random().toString(36).substr(2, 9), type: EXPENSE_TYPES[0], value: 0 }
+      ]
+    });
+  };
+
+  const handleUpdateExpense = (id: string, field: keyof Expense, value: any) => {
+    setFormData({
+      ...formData,
+      expenses: formData.expenses.map(exp => exp.id === id ? { ...exp, [field]: value } : exp)
+    });
+  };
+
+  const handleRemoveExpense = (id: string) => {
+    setFormData({
+      ...formData,
+      expenses: formData.expenses.filter(exp => exp.id !== id)
+    });
+  };
+
+  const totalExpenses = formData.expenses.reduce((acc, exp) => acc + (exp.value || 0), 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,6 +263,62 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
                 </select>
               </div>
             </div>
+          </section>
+
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Despesas</h2>
+              <button 
+                type="button"
+                onClick={handleAddExpense}
+                className="text-primary hover:text-brand-cyan transition-colors flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-lg">add_circle</span>
+                <span className="text-xs font-bold">Adicionar</span>
+              </button>
+            </div>
+            
+            {formData.expenses.length > 0 ? (
+              <div className="space-y-3">
+                {formData.expenses.map((expense) => (
+                  <div key={expense.id} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <select
+                      className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary dark:text-white"
+                      value={expense.type}
+                      onChange={e => handleUpdateExpense(expense.id, 'type', e.target.value)}
+                    >
+                      {EXPENSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <div className="relative w-32">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">R$</span>
+                      <input
+                        type="number"
+                        className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg pl-8 pr-3 py-2 text-sm focus:ring-2 focus:ring-primary dark:text-white"
+                        value={expense.value}
+                        onChange={e => handleUpdateExpense(expense.id, 'value', Number(e.target.value))}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExpense(expense.id)}
+                      className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-lg">delete</span>
+                    </button>
+                  </div>
+                ))}
+                <div className="flex justify-between items-center px-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                  <span className="text-sm font-bold text-gray-600 dark:text-gray-400">Total de Despesas:</span>
+                  <span className="text-sm font-black text-red-500">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalExpenses)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 border-dashed">
+                <p className="text-xs text-gray-500">Nenhuma despesa cadastrada.</p>
+              </div>
+            )}
           </section>
 
           <section className="space-y-4">

@@ -271,6 +271,8 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
             const formatGoogleDate = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
             const googleCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${formatGoogleDate(eventDate)}/${formatGoogleDate(endDate)}&details=${encodeURIComponent('Empresa: ' + (company?.name || ''))}&location=${encodeURIComponent(event.location || '')}`;
 
+            const totalExpenses = (event.expenses || []).reduce((acc, exp) => acc + (exp.value || 0), 0);
+
             return (
             <div key={event.id} className="rounded-xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md flex flex-col relative overflow-hidden" style={{ backgroundColor: companyColor ? `${companyColor}20` : 'var(--bg-white)', borderColor: companyColor ? `${companyColor}40` : undefined }}>
               <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: companyColor || '#e2e8f0' }}></div>
@@ -336,6 +338,12 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
                   <span className="material-symbols-outlined text-sm">payments</span>
                   <span>{showValues ? `R$ ${event.value.toLocaleString('pt-BR')}` : 'R$ •••'}</span>
                 </div>
+                {totalExpenses > 0 && (
+                  <div className="flex items-center gap-2 text-red-500 font-bold text-xs" title="Total de Despesas">
+                    <span className="material-symbols-outlined text-sm">money_off</span>
+                    <span>{showValues ? `- R$ ${totalExpenses.toLocaleString('pt-BR')}` : '- R$ •••'}</span>
+                  </div>
+                )}
               </div>
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-50 dark:border-slate-800 mt-auto pl-2">
                 <a 
