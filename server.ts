@@ -16,8 +16,42 @@ function getDb() {
   if (!db) {
     const apps = admin.apps || [];
     if (apps.length === 0) {
-      const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n').trim().replace(/^["']|["']$/g, '');
+      let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
       
+      // Remove surrounding quotes
+      privateKey = privateKey.replace(/^["']|["']$/g, '');
+      
+      // Handle escaped newlines
+      privateKey = privateKey.replace(/\\n/g, '\n');
+      
+      // Check if it's a JSON string (downloaded service account file)
+      if (privateKey.trim().startsWith('{')) {
+        try {
+          const json = JSON.parse(privateKey);
+          if (json.private_key) {
+            privateKey = json.private_key;
+          }
+        } catch (e) {
+          console.error("[Firebase] Error parsing private key as JSON:", e);
+        }
+      }
+
+      // If it already has headers, it should be fine
+      if (privateKey.startsWith('-----BEGIN PRIVATE KEY-----')) {
+          privateKey = privateKey.trim();
+      } else {
+          // Remove existing headers/footers and all whitespace to get raw base64
+          const rawBase64 = privateKey
+            .replace(/-----BEGIN PRIVATE KEY-----/g, '')
+            .replace(/-----END PRIVATE KEY-----/g, '')
+            .replace(/\s+/g, '');
+          
+          // Re-add headers/footers with proper 64-character line breaks
+          privateKey = `-----BEGIN PRIVATE KEY-----\n${rawBase64.match(/.{1,64}/g)?.join('\n')}\n-----END PRIVATE KEY-----`;
+      }
+      
+      console.log("[Firebase] Private key prepared.");
+
       if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !privateKey) {
         const missing = [];
         if (!process.env.FIREBASE_PROJECT_ID) missing.push("FIREBASE_PROJECT_ID");
@@ -318,16 +352,20 @@ async function startServer() {
           </body></html>
         `);
       } catch (err: any) {
-        console.error("Error exchanging code for tokens:", err.response?.data || err.message);
+        console.error("Error exchanging code for tokens:", err);
+        if (err.response) {
+          console.error("Response data:", err.response.data);
+          console.error("Response status:", err.response.status);
+        }
         res.send(`
           <html><body>
             <script>
               if (window.opener) {
-                window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: 'Failed to exchange tokens' }, '*');
+                window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: 'Failed to exchange tokens: ' + (err.message || 'Unknown error') }, '*');
                 window.close();
               }
             </script>
-            <p>Erro ao processar autenticação.</p>
+            <p>Erro ao processar autenticação: ${err.message}</p>
           </body></html>
         `);
       }

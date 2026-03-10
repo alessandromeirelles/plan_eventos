@@ -134,7 +134,7 @@ const App: React.FC = () => {
     
     const eventData = { ...event, user_id: user.email };
     if (event.id) {
-      await updateDoc(doc(db, 'events', event.id), eventData as any);
+      await setDoc(doc(db, 'events', event.id), eventData as any, { merge: true });
     } else {
       const newDocRef = doc(collection(db, 'events'));
       await setDoc(newDocRef, { ...eventData, id: newDocRef.id });
@@ -147,7 +147,13 @@ const App: React.FC = () => {
   };
 
   const handleStatusChange = async (id: string, newStatus: EventStatus) => {
-    await updateDoc(doc(db, 'events', id), { status: newStatus });
+    const docRef = doc(db, 'events', id);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      await updateDoc(docRef, { status: newStatus });
+    } else {
+      console.warn(`Event ${id} not found, cannot update status.`);
+    }
   };
 
   const handleSaveCompany = async (company: Company) => {

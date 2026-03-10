@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { EventStatus, InvoiceStatus } from '../types';
-import type { PlanEvent, ViewState, Company } from '../types';
+import type { PlanEvent, ViewState, Company, Expense } from '../types';
 import Logo from '../components/Logo';
 
 import { getTodayString } from '../utils';
@@ -16,11 +16,93 @@ interface Props {
   onNew: () => void;
   onStatusChange: (id: string, newStatus: EventStatus) => void;
   onInvoiceStatusChange: (id: string, newStatus: InvoiceStatus) => void;
+  onUpdateEvent: (event: PlanEvent) => void;
+  expenseTypes: string[];
+  onUpdateExpenseTypes: (types: string[]) => void;
   showValues: boolean;
   setShowValues: (show: boolean) => void;
 }
 
-const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, onEdit, onNavigate, onNew, onStatusChange, onInvoiceStatusChange, showValues, setShowValues }) => {
+const ExpenseForm: React.FC<{
+  event: PlanEvent;
+  expenseTypes: string[];
+  onUpdateExpenseTypes: (types: string[]) => void;
+  onUpdateEvent: (event: PlanEvent) => void;
+}> = ({ event, expenseTypes, onUpdateExpenseTypes, onUpdateEvent }) => {
+  const [newExpense, setNewExpense] = useState<{type: string, value: string}>({type: '', value: ''});
+
+  return (
+    <div className="flex gap-2 mt-2 flex-wrap items-center">
+      <button
+        onClick={() => {
+          if (newExpense.type && !expenseTypes.includes(newExpense.type)) {
+             onUpdateExpenseTypes([...expenseTypes, newExpense.type]);
+          }
+        }}
+        className="bg-slate-500 text-white p-1 rounded"
+        title="Adicionar novo tipo de despesa"
+      >
+        <span className="material-symbols-outlined text-sm">add</span>
+      </button>
+      <span className="text-slate-500 font-bold text-sm">+</span>
+      <input 
+        list={`expense-types-${event.id}`}
+        placeholder="Tipo de despesa"
+        className="flex-1 text-xs p-1 rounded border dark:bg-slate-700 dark:border-slate-600"
+        value={newExpense.type}
+        onChange={(e) => setNewExpense({...newExpense, type: e.target.value})}
+      />
+      <datalist id={`expense-types-${event.id}`}>
+        {expenseTypes.map(t => <option key={t} value={t} />)}
+      </datalist>
+      <input 
+        type="number" 
+        placeholder="R$" 
+        className="w-16 text-xs p-1 rounded border dark:bg-slate-700 dark:border-slate-600"
+        value={newExpense.value}
+        onChange={(e) => setNewExpense({...newExpense, value: e.target.value})}
+      />
+      <button 
+        onClick={() => {
+          if (!newExpense.type || !newExpense.value) return;
+          const updatedExpenses = [...(event.expenses || []), { id: Date.now().toString(), type: newExpense.type, value: parseFloat(newExpense.value) }];
+          onUpdateEvent({...event, expenses: updatedExpenses});
+          setNewExpense({type: '', value: ''});
+        }}
+        className="bg-brand-orange text-white p-1 rounded"
+      >
+        <span className="material-symbols-outlined text-sm">add</span>
+      </button>
+    </div>
+  );
+};
+
+const ExpenseList: React.FC<{
+  event: PlanEvent;
+  showValues: boolean;
+  onUpdateEvent: (event: PlanEvent) => void;
+}> = ({ event, showValues, onUpdateEvent }) => {
+  return (
+    <div className="space-y-1">
+      {(event.expenses || []).map((exp, i) => (
+        <div key={i} className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-300">
+          <span>{exp.type}: {showValues ? `R$ ${exp.value.toLocaleString('pt-BR')}` : 'R$ •••'}</span>
+          <button 
+            onClick={() => {
+              const updatedExpenses = (event.expenses || []).filter((_, index) => index !== i);
+              onUpdateEvent({...event, expenses: updatedExpenses});
+            }} 
+            className="text-red-500 hover:text-red-700"
+          >
+            <span className="material-symbols-outlined text-sm">delete</span>
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, onEdit, onNavigate, onNew, onStatusChange, onInvoiceStatusChange, onUpdateEvent, expenseTypes, onUpdateExpenseTypes, showValues, setShowValues }) => {
   const [activeTab, setActiveTab] = useState<'Todos' | EventStatus | 'Empresa'>('Todos');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -28,6 +110,7 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
   const [selectedCompany, setSelectedCompany] = useState('');
   const [selectedEventType, setSelectedEventType] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
 
   const filteredEvents = events.filter(e => {
     const matchStatus = activeTab === 'Todos' || activeTab === 'Empresa' || e.status === activeTab;
@@ -338,13 +421,34 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
                   <span className="material-symbols-outlined text-sm">payments</span>
                   <span>{showValues ? `R$ ${event.value.toLocaleString('pt-BR')}` : 'R$ •••'}</span>
                 </div>
-                {totalExpenses > 0 && (
-                  <div className="flex items-center gap-2 text-red-500 font-bold text-xs" title="Total de Despesas">
-                    <span className="material-symbols-outlined text-sm">money_off</span>
-                    <span>{showValues ? `- R$ ${totalExpenses.toLocaleString('pt-BR')}` : '- R$ •••'}</span>
+              </div>
+
+              {/* Expense Management */}
+              <div className="mt-2 pl-2">
+                <button 
+                  onClick={() => setExpandedEventId(expandedEventId === event.id ? null : event.id)}
+                  className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-brand-orange"
+                >
+                  <span className="material-symbols-outlined text-sm">{expandedEventId === event.id ? 'expand_less' : 'expand_more'}</span>
+                  Despesas
+                </button>
+                {expandedEventId === event.id && (
+                  <div className="mt-2 space-y-2 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl">
+                    <ExpenseList 
+                      event={event} 
+                      showValues={showValues} 
+                      onUpdateEvent={onUpdateEvent} 
+                    />
+                    <ExpenseForm 
+                      event={event} 
+                      expenseTypes={expenseTypes} 
+                      onUpdateExpenseTypes={onUpdateExpenseTypes} 
+                      onUpdateEvent={onUpdateEvent} 
+                    />
                   </div>
                 )}
               </div>
+
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-50 dark:border-slate-800 mt-auto pl-2">
                 <a 
                   href={googleCalUrl} 
@@ -372,7 +476,8 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
                 </button>
               </div>
             </div>
-          )})}
+            )
+          })}
           
           {filteredEvents.length === 0 && (
             <div className="text-center py-20 opacity-50">

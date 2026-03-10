@@ -29,6 +29,7 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
   const [todayEvents, setTodayEvents] = useState<PlanEvent[]>([]);
   const [notifUpcomingEvents, setNotifUpcomingEvents] = useState<PlanEvent[]>([]);
   const [showDailyAlert, setShowDailyAlert] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   useEffect(() => {
     const today = getTodayString();
@@ -180,6 +181,7 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
 
   const handleConnectGoogleCalendar = async () => {
     if (!user?.uid) return;
+    setIsConnecting(true);
     try {
       const origin = window.location.origin;
       const redirectUri = `${origin}/api/auth/google/callback`;
@@ -201,10 +203,12 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
 
       if (!authWindow) {
         alert('Por favor, permita popups para conectar sua agenda do Google.');
+        setIsConnecting(false);
       }
     } catch (error: any) {
       console.error('Error connecting to Google Calendar:', error);
       alert(`Erro ao iniciar conexão: ${error.message}\n\nCertifique-se de que o GOOGLE_CLIENT_ID está configurado no servidor.`);
+      setIsConnecting(false);
     }
   };
 
@@ -218,6 +222,7 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
         alert('Google Calendar conectado com sucesso!');
         window.location.reload();
       } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
+        setIsConnecting(false);
         const errorMsg = event.data.error || 'Erro desconhecido';
         console.error('[Google Auth] Error from popup:', errorMsg);
         if (errorMsg.includes('redirect_uri_mismatch')) {
@@ -410,8 +415,12 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
                       onClick={handleConnectGoogleCalendar}
                       className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-slate-800 border border-brand-orange text-brand-orange shadow-lg hover:bg-brand-orange hover:text-white transition-all active:scale-95"
                     >
-                      <img src="https://www.gstatic.com/images/branding/product/1x/calendar_48dp.png" alt="Google Calendar" className="w-4 h-4" />
-                      <span className="text-[10px] font-black uppercase tracking-widest">Conectar Agenda</span>
+                      {isConnecting ? (
+                        <div className="size-4 border-2 border-brand-orange border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <img src="https://www.gstatic.com/images/branding/product/1x/calendar_48dp.png" alt="Google Calendar" className="w-4 h-4" />
+                      )}
+                      <span className="text-[10px] font-black uppercase tracking-widest">{isConnecting ? 'Conectando...' : 'Conectar Agenda'}</span>
                     </button>
                   </div>
                 ) : (

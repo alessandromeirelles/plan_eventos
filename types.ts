@@ -68,6 +68,7 @@ export interface User {
   cnpj?: string;
   status?: 'active' | 'suspended' | 'deleted';
   event_types?: string[];
+  expense_types?: string[];
   google_calendar_connected?: boolean;
   role?: 'admin' | 'user';
   last_activity?: string;
