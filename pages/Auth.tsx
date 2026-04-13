@@ -85,15 +85,16 @@ const Auth: React.FC<Props> = ({ onLogin, onCancel }) => {
       }
 
       if (isLogin) {
-        // Special case for hardcoded admin - try to sign in normally first
-        // If it fails with user-not-found and it's the admin credentials, we might have a problem
-        // But for now, let's just use standard Firebase Auth
         try {
+          console.log("Tentando login com:", email);
           await signInWithEmailAndPassword(auth, email, password);
+          console.log("Login Firebase bem-sucedido!");
         } catch (err: any) {
+          console.error("Erro no login Firebase:", err.code, err.message);
+          
           // If it's the hardcoded admin and Firebase login fails, we allow it for demo purposes
-          // BUT we must be careful because onAuthStateChanged will kick them out if not in Firebase
           if (email === 'admin@admin.com.br' && password === '@Le010313') {
+            console.log("Admin bypass ativado.");
             onLogin({
               email: 'admin@admin.com.br',
               name: 'Administrador',

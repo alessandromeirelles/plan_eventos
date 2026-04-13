@@ -4,7 +4,7 @@ import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged, updatePassword } from 'firebase/auth';
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { User, PlanEvent, Company, ViewState } from './types';
-import { EventStatus } from './types';
+import { EventStatus, InvoiceStatus } from './types';
 
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
@@ -27,6 +27,7 @@ const App: React.FC = () => {
   const [events, setEvents] = useState<PlanEvent[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [eventTypes, setEventTypes] = useState<string[]>(['Reunião', 'Casamento', 'Aniversário', 'Formatura', 'Corporativo']);
+  const [expenseTypes, setExpenseTypes] = useState<string[]>(['Buffet', 'Decoração', 'Som', 'Local', 'Outros']);
   const [editingEvent, setEditingEvent] = useState<PlanEvent | undefined>();
   const [editingCompany, setEditingCompany] = useState<Company | undefined>();
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('monthly');
@@ -62,6 +63,9 @@ const App: React.FC = () => {
           setUser({ ...userData, uid: firebaseUser.uid });
           if (userData.event_types) {
             setEventTypes(userData.event_types);
+          }
+          if (userData.expense_types) {
+            setExpenseTypes(userData.expense_types);
           }
           if (userData.role === 'admin') {
             setCurrentView('ADMIN_DASHBOARD');
@@ -156,6 +160,15 @@ const App: React.FC = () => {
     }
   };
 
+  const handleInvoiceStatusChange = async (id: string, newStatus: InvoiceStatus) => {
+    const docRef = doc(db, 'events', id);
+    await updateDoc(docRef, { invoice_status: newStatus });
+  };
+
+  const handleUpdateEvent = async (event: PlanEvent) => {
+    await setDoc(doc(db, 'events', event.id), event as any, { merge: true });
+  };
+
   const handleSaveCompany = async (company: Company) => {
     if (!user?.email) return;
     
@@ -203,7 +216,7 @@ const App: React.FC = () => {
       case 'DASHBOARD':
         return <Dashboard events={events} companies={companies} onNavigate={handleNavigate} trialDaysLeft={trialDaysLeft} user={user} showValues={showValues} setShowValues={setShowValues} />;
       case 'EVENTS':
-        return <EventList events={events} companies={companies} eventTypes={eventTypes} onDelete={handleDeleteEvent} onEdit={(e) => { setEditingEvent(e); handleNavigate('EDIT_EVENT'); }} onNavigate={handleNavigate} onNew={() => { setEditingEvent(undefined); handleNavigate('NEW_EVENT'); }} onStatusChange={handleStatusChange} />;
+        return <EventList events={events} companies={companies} eventTypes={eventTypes} onDelete={handleDeleteEvent} onEdit={(e) => { setEditingEvent(e); handleNavigate('EDIT_EVENT'); }} onNavigate={handleNavigate} onNew={() => { setEditingEvent(undefined); handleNavigate('NEW_EVENT'); }} onStatusChange={handleStatusChange} onInvoiceStatusChange={handleInvoiceStatusChange} onUpdateEvent={handleUpdateEvent} expenseTypes={expenseTypes} onUpdateExpenseTypes={async (types) => { setExpenseTypes(types); if (user?.uid) await updateDoc(doc(db, 'users', user.uid), { expense_types: types }); }} showValues={showValues} setShowValues={setShowValues} />;
       case 'COMPANIES':
         return <CompanyList companies={companies} events={events} onNavigate={handleNavigate} onNew={() => { setEditingCompany(undefined); handleNavigate('NEW_COMPANY'); }} onEdit={(c) => { setEditingCompany(c); handleNavigate('EDIT_COMPANY'); }} onDelete={handleDeleteCompany} />;
       case 'NEW_EVENT':
