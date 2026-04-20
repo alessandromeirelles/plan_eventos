@@ -232,7 +232,7 @@ const App: React.FC = () => {
       case 'ADMIN_DASHBOARD':
         return <AdminDashboard onLogout={handleLogout} onNavigate={handleNavigate} />;
       case 'REPORTS':
-        return <Reports events={events} onNavigate={handleNavigate} showValues={showValues} setShowValues={setShowValues} />;
+        return <Reports events={events} companies={companies} eventTypes={eventTypes} onNavigate={handleNavigate} showValues={showValues} setShowValues={setShowValues} />;
       default:
         return <Landing onNavigate={handleNavigate} />;
     }

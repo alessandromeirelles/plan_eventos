@@ -12,6 +12,7 @@ const Navigation: React.FC<Props> = ({ currentView, onNavigate, user }) => {
     { name: 'Início', view: 'DASHBOARD' as ViewState, icon: 'home' },
     { name: 'Clientes', view: 'COMPANIES' as ViewState, icon: 'groups' },
     { name: 'Eventos', view: 'EVENTS' as ViewState, icon: 'event' },
+    { name: 'Financeiro', view: 'REPORTS' as ViewState, icon: 'analytics' },
     { name: 'Perfil', view: 'SETTINGS' as ViewState, icon: 'person' },
   ];
 

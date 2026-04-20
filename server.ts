@@ -36,20 +36,35 @@ function getDb() {
         }
       }
 
+      console.log("[Firebase] Preparing private key...");
+      console.log("[Firebase] Key length:", privateKey.length);
+      console.log("[Firebase] Key starts with:", privateKey.substring(0, 30));
+      console.log("[Firebase] Key ends with:", privateKey.substring(privateKey.length - 30));
+
       // If it already has headers, it should be fine
       if (privateKey.startsWith('-----BEGIN PRIVATE KEY-----')) {
+          console.log("[Firebase] Key has headers.");
           privateKey = privateKey.trim();
       } else {
+          console.log("[Firebase] Key missing headers, attempting to format...");
           // Remove existing headers/footers and all whitespace to get raw base64
           const rawBase64 = privateKey
             .replace(/-----BEGIN PRIVATE KEY-----/g, '')
             .replace(/-----END PRIVATE KEY-----/g, '')
             .replace(/\s+/g, '');
           
+          console.log("[Firebase] Raw base64 length:", rawBase64.length);
+          
           // Re-add headers/footers with proper 64-character line breaks
-          privateKey = `-----BEGIN PRIVATE KEY-----\n${rawBase64.match(/.{1,64}/g)?.join('\n')}\n-----END PRIVATE KEY-----`;
+          const match = rawBase64.match(/.{1,64}/g);
+          if (match) {
+            privateKey = `-----BEGIN PRIVATE KEY-----\n${match.join('\n')}\n-----END PRIVATE KEY-----`;
+          } else {
+            console.error("[Firebase] Failed to match base64 content.");
+          }
       }
       
+      console.log("[Firebase] Final key format check:", privateKey.substring(0, 30), "...", privateKey.substring(privateKey.length - 30));
       console.log("[Firebase] Private key prepared.");
 
       if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !privateKey) {

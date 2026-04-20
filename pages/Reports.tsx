@@ -1,23 +1,40 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   LineChart, Line, Legend, AreaChart, Area 
 } from 'recharts';
-import type { PlanEvent, ViewState } from '../types';
+import type { PlanEvent, ViewState, Company } from '../types';
+import { EventStatus } from '../types';
 
 interface Props {
   events: PlanEvent[];
+  companies: Company[];
+  eventTypes: string[];
   onNavigate: (view: ViewState) => void;
   showValues: boolean;
   setShowValues: (show: boolean) => void;
 }
 
-const Reports: React.FC<Props> = ({ events, onNavigate, showValues, setShowValues }) => {
+const Reports: React.FC<Props> = ({ events, companies, eventTypes, onNavigate, showValues, setShowValues }) => {
+  const [companyId, setCompanyId] = useState<string>('all');
+  const [eventType, setEventType] = useState<string>('all');
+  const [paymentStatus, setPaymentStatus] = useState<string>('all');
+  const [dateRange, setDateRange] = useState<string>('all');
+
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      const matchesCompany = companyId === 'all' || event.company_id === companyId;
+      const matchesType = eventType === 'all' || event.type === eventType;
+      const matchesStatus = paymentStatus === 'all' || event.status === paymentStatus;
+      return matchesCompany && matchesType && matchesStatus;
+    });
+  }, [events, companyId, eventType, paymentStatus]);
+
   const monthlyData = useMemo(() => {
     const data: Record<string, { month: string; revenue: number; count: number; rawDate: Date }> = {};
     
-    events.forEach(event => {
+    filteredEvents.forEach(event => {
       const date = new Date(event.date + 'T12:00:00');
       const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
       const monthLabel = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
@@ -36,11 +53,24 @@ const Reports: React.FC<Props> = ({ events, onNavigate, showValues, setShowValue
     });
     
     return Object.values(data).sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime());
-  }, [events]);
+  }, [filteredEvents]);
 
-  const totalRevenue = events.reduce((acc, curr) => acc + curr.value, 0);
-  const totalEvents = events.length;
+  const totalRevenue = filteredEvents.reduce((acc, curr) => acc + curr.value, 0);
+  const totalEvents = filteredEvents.length;
   const avgValue = totalEvents > 0 ? totalRevenue / totalEvents : 0;
+  
+  const currentMonthRevenue = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    return filteredEvents
+      .filter(event => {
+        const date = new Date(event.date + 'T12:00:00');
+        return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+      })
+      .reduce((acc, curr) => acc + curr.value, 0);
+  }, [filteredEvents]);
 
   return (
     <div className="pb-32 animate-in fade-in duration-700">
@@ -65,8 +95,36 @@ const Reports: React.FC<Props> = ({ events, onNavigate, showValues, setShowValue
       </header>
 
       <div className="p-5 space-y-8">
+        {/* Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+          <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className="bg-slate-50 dark:bg-slate-800 border-none rounded-2xl p-3 text-sm font-bold text-brand-navy dark:text-white">
+            <option value="all">Todas as Empresas</option>
+            {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <select value={eventType} onChange={(e) => setEventType(e.target.value)} className="bg-slate-50 dark:bg-slate-800 border-none rounded-2xl p-3 text-sm font-bold text-brand-navy dark:text-white">
+            <option value="all">Todos os Tipos</option>
+            {eventTypes.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} className="bg-slate-50 dark:bg-slate-800 border-none rounded-2xl p-3 text-sm font-bold text-brand-navy dark:text-white">
+            <option value="all">Todos os Status</option>
+            {Object.values(EventStatus).map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="size-10 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 flex items-center justify-center">
+                <span className="material-symbols-outlined">payments</span>
+              </div>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ganhos Mês Atual</span>
+            </div>
+            <p className="text-2xl font-black text-brand-navy dark:text-white">
+              {showValues ? `R$ ${currentMonthRevenue.toLocaleString('pt-BR')}` : 'R$ ••••••'}
+            </p>
+          </div>
+
           <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className="size-10 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 flex items-center justify-center">

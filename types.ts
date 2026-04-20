@@ -44,6 +44,7 @@ export interface PlanEvent {
   expenses?: Expense[];
   invoice_status?: InvoiceStatus;
   invoice_number?: string;
+  invoice_url?: string;
   user_id?: string;
   created_at?: string;
   updated_at?: string;

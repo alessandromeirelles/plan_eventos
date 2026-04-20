@@ -402,6 +402,40 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
                       'text-slate-500 dark:text-slate-400'
                     }`}>arrow_drop_down</span>
                   </div>
+                  {event.invoice_url ? (
+                    <a 
+                      href={event.invoice_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="mt-1 flex items-center gap-1 text-[9px] font-black text-blue-500 hover:text-blue-700 uppercase tracking-wide bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded shadow-sm"
+                    >
+                      <span className="material-symbols-outlined text-[12px]">download</span>
+                      Ver PDF
+                    </a>
+                  ) : (
+                    <div className="mt-1">
+                      <input 
+                        type="file" 
+                        accept="application/pdf" 
+                        className="hidden" 
+                        id={`invoice-upload-${event.id}`}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const url = URL.createObjectURL(file);
+                            onUpdateEvent({ ...event, invoice_url: url });
+                          }
+                        }}
+                      />
+                      <label 
+                        htmlFor={`invoice-upload-${event.id}`}
+                        className="flex items-center gap-1 text-[9px] font-black text-slate-500 hover:text-brand-orange cursor-pointer uppercase tracking-wide bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded shadow-sm transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[12px]">upload_file</span>
+                        Anexar NF
+                      </label>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-y-2 text-sm mb-4 flex-1 pl-2">

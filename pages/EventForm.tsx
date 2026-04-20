@@ -40,8 +40,11 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
     expenses: initialData?.expenses || [],
     location: initialData?.location || '',
     invoice_status: initialData?.invoice_status || InvoiceStatus.PENDING,
-    invoice_number: initialData?.invoice_number || ''
+    invoice_number: initialData?.invoice_number || '',
+    invoice_url: initialData?.invoice_url || ''
   });
+
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
 
   const handleAddExpense = () => {
     setFormData({
@@ -71,9 +74,16 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Simulating file upload URL if a new file was selected
+    const finalData = { ...formData };
+    if (invoiceFile) {
+      finalData.invoice_url = URL.createObjectURL(invoiceFile);
+    }
+
     onSave({
       ...initialData,
-      ...formData
+      ...finalData
     } as PlanEvent);
   };
 
@@ -361,6 +371,27 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
                   placeholder="Ex: NF-00123"
                   disabled={formData.invoice_status === InvoiceStatus.PENDING}
                 />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Anexo da NF (PDF)</label>
+                <div className="relative">
+                  <input 
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    id="invoice-file-upload"
+                    onChange={e => setInvoiceFile(e.target.files?.[0] || null)}
+                  />
+                  <label 
+                    htmlFor="invoice-file-upload"
+                    className="w-full flex items-center justify-between bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 text-sm cursor-pointer hover:border-primary transition-all dark:text-white"
+                  >
+                    <span className="truncate max-w-[200px]">
+                      {invoiceFile ? invoiceFile.name : (formData.invoice_url ? 'Alterar PDF' : 'Selecionar PDF')}
+                    </span>
+                    <span className="material-symbols-outlined text-brand-orange">upload_file</span>
+                  </label>
+                </div>
               </div>
             </div>
           </section>

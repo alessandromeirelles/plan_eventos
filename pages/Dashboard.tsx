@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { EventStatus, InvoiceStatus } from '../types';
 import type { PlanEvent, Company, ViewState, User } from '../types';
 import Logo from '../components/Logo';
@@ -30,6 +30,25 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
   const [notifUpcomingEvents, setNotifUpcomingEvents] = useState<PlanEvent[]>([]);
   const [showDailyAlert, setShowDailyAlert] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDateEvents, setSelectedDateEvents] = useState<PlanEvent[]>([]);
+
+  const daysInMonth = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const days = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year, month, 1).getDay();
+    return { days, firstDay };
+  }, [currentDate]);
+
+  const getEventsForDay = (day: number) => {
+    const dateStr = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    return events.filter(e => e.date === dateStr);
+  };
+
+  const changeMonth = (delta: number) => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + delta, 1));
+  };
 
   useEffect(() => {
     const today = getTodayString();
@@ -492,6 +511,82 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest relative z-10">Total (Mês)</p>
           </div>
         </div>
+
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm mb-10">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-black text-brand-navy dark:text-white uppercase tracking-tight">
+              {currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+            </h3>
+            <div className="flex gap-2">
+              <button onClick={() => changeMonth(-1)} className="p-2 rounded-full bg-slate-100 dark:bg-slate-800"><span className="material-symbols-outlined">chevron_left</span></button>
+              <button onClick={() => changeMonth(1)} className="p-2 rounded-full bg-slate-100 dark:bg-slate-800"><span className="material-symbols-outlined">chevron_right</span></button>
+            </div>
+          </div>
+          <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-2">
+            {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => <div key={d}>{d}</div>)}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: daysInMonth.firstDay }).map((_, i) => <div key={`empty-${i}`} />)}
+            {Array.from({ length: daysInMonth.days }).map((_, i) => {
+              const day = i + 1;
+              const dayEvents = getEventsForDay(day);
+              
+              return (
+                <div key={day} className="aspect-square flex items-center justify-center cursor-pointer" onClick={() => {
+                  if (dayEvents.length > 0) setSelectedDateEvents(dayEvents);
+                }}>
+                  <div 
+                    className={`size-12 flex items-center justify-center rounded-full border-2 ${dayEvents.length > 0 ? 'border-transparent' : 'border-slate-100 dark:border-slate-800'}`}
+                    style={{ backgroundColor: dayEvents.length > 0 ? 'transparent' : 'transparent' }}
+                  >
+                    {dayEvents.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-0.5">
+                        {dayEvents.slice(0, 4).map((e, idx) => {
+                          const company = companies.find(c => c.id === e.company_id);
+                          return (
+                            <div key={e.id} className="size-9 rounded-full overflow-hidden border border-white dark:border-slate-900">
+                              {company?.logo_url ? (
+                                <img src={company.logo_url} alt={company.name} className="size-full object-cover" />
+                              ) : (
+                                <div className="size-full flex items-center justify-center text-[14px] text-white font-black" style={{ backgroundColor: company?.color || '#F27D26' }}>
+                                  {company?.name.charAt(0)}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span className="text-sm font-black text-slate-600 dark:text-slate-300">{day}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {selectedDateEvents.length > 0 && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-6 animate-in fade-in duration-300" onClick={() => setSelectedDateEvents([])}>
+            <div className="bg-white dark:bg-slate-900 rounded-[32px] p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-300 border border-white/20" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-black text-brand-navy dark:text-white uppercase tracking-tight">Eventos</h3>
+                <button onClick={() => setSelectedDateEvents([])} className="text-slate-400 hover:text-brand-navy dark:hover:text-white">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <div className="space-y-4 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                {selectedDateEvents.map(e => (
+                  <div key={e.id} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <p className="text-sm font-black text-brand-navy dark:text-white">{e.title}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{e.type}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Status: {e.status}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-4">
           <div className="flex justify-between items-center px-1">
