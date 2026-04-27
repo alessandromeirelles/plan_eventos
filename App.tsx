@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged, updatePassword } from 'firebase/auth';
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
@@ -24,6 +24,7 @@ import { initGoogleScripts } from './googleCalendarService';
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('LANDING');
   const [user, setUser] = useState<User | null>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [events, setEvents] = useState<PlanEvent[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [eventTypes, setEventTypes] = useState<string[]>(['Reunião', 'Casamento', 'Aniversário', 'Formatura', 'Corporativo']);
@@ -34,6 +35,9 @@ const App: React.FC = () => {
   const [showValues, setShowValues] = useState(true);
   const [trialDaysLeft, setTrialDaysLeft] = useState(7);
   const [googleScriptsLoaded, setGoogleScriptsLoaded] = useState(false);
+  
+  const currentViewRef = useRef(currentView);
+  useEffect(() => { currentViewRef.current = currentView; }, [currentView]);
 
   useEffect(() => {
     if (user?.trial_start_date) {
@@ -54,6 +58,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setIsLoadingAuth(true);
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userDoc = await getDoc(userDocRef);
@@ -67,10 +72,12 @@ const App: React.FC = () => {
           if (userData.expense_types) {
             setExpenseTypes(userData.expense_types);
           }
-          if (userData.role === 'admin') {
-            setCurrentView('ADMIN_DASHBOARD');
-          } else {
-            setCurrentView('DASHBOARD');
+          if (currentViewRef.current === 'LANDING' || currentViewRef.current === 'AUTH') {
+             if (userData.role === 'admin') {
+               setCurrentView('ADMIN_DASHBOARD');
+             } else {
+               setCurrentView('DASHBOARD');
+             }
           }
         } else {
           // Create new user
@@ -92,6 +99,7 @@ const App: React.FC = () => {
         setUser(null);
         setCurrentView('LANDING');
       }
+      setIsLoadingAuth(false);
     });
 
     return () => unsubscribe();

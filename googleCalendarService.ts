@@ -28,7 +28,7 @@ export const initGoogleScripts = (callback: (isInited: boolean) => void) => {
         const initConfig: any = {
           discoveryDocs: [DISCOVERY_DOC],
         };
-        if (API_KEY) {
+        if (API_KEY && API_KEY.trim() !== '' && API_KEY !== 'undefined') {
           initConfig.apiKey = API_KEY;
         }
         await gapi.client.init(initConfig);

@@ -9,7 +9,8 @@ export enum EventStatus {
 export enum InvoiceStatus {
   ISSUED = 'SIM',
   PENDING = 'PENDENTE',
-  CANCELED = 'CANCELADA'
+  CANCELED = 'CANCELADA',
+  NOT_REQUESTED = 'NÃO SOLICITADO'
 }
 
 export interface Company {
