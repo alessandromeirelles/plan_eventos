@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { EventStatus, InvoiceStatus } from '../types';
 import type { PlanEvent, Company, ViewState, User } from '../types';
 import Logo from '../components/Logo';
+import TrialWarningModal from '../components/TrialWarningModal';
 
 import { getTodayString } from '../utils';
 
@@ -40,6 +41,16 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
     const firstDay = new Date(year, month, 1).getDay();
     return { days, firstDay };
   }, [currentDate]);
+
+  const isGracePeriod = useMemo(() => {
+    return user?.subscription_status === 'trial' && trialDaysLeft === 0;
+  }, [user?.subscription_status, trialDaysLeft]);
+
+  const showWarningModal = useMemo(() => {
+      // Show if expired/grace period, or close to expiry (e.g. < 5 days)
+      return isGracePeriod || (user?.subscription_status === 'trial' && trialDaysLeft <= 5);
+  }, [isGracePeriod, user?.subscription_status, trialDaysLeft]);
+
 
   const getEventsForDay = (day: number) => {
     const dateStr = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
@@ -257,6 +268,9 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
 
   return (
     <div className="pb-32 animate-in fade-in duration-700 relative">
+      {showWarningModal && (
+          <TrialWarningModal daysLeft={isGracePeriod ? 7 : 5 - trialDaysLeft} isGracePeriod={isGracePeriod} onSubscribe={() => onNavigate('CHECKOUT')} />
+      )}
       {showDailyAlert && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-6 animate-in fade-in duration-300">
           <div className="bg-white dark:bg-slate-900 rounded-[40px] p-8 max-w-sm w-full flex flex-col items-center text-center shadow-2xl animate-in zoom-in-95 duration-300 border border-white/20">

@@ -114,6 +114,13 @@ const Auth: React.FC<Props> = ({ onLogin, onCancel }) => {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         await updateProfile(user, { displayName: name });
+
+        // Notify Admin
+        fetch('/api/admin/notify-new-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userName: name, userEmail: email })
+        }).catch(console.error);
       }
     } catch (err: any) {
       console.error("Auth Error:", err);

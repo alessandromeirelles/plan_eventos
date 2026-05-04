@@ -11,6 +11,7 @@ interface Props {
 const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [newUsersCount, setNewUsersCount] = useState<number>(0);
   const [showRetentionModal, setShowRetentionModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [retentionResult, setRetentionResult] = useState<{message: string, isError: boolean} | null>(null);
@@ -18,6 +19,14 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+      if (!loading && users.length > 0) {
+          const lastCheck = localStorage.getItem('last_admin_check') || '0';
+          const newUsersCount = users.filter(u => u.trial_start_date && u.trial_start_date > lastCheck).length;
+          setNewUsersCount(newUsersCount);
+      }
+  }, [users, loading]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -115,6 +124,26 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
           </button>
         </div>
       </header>
+
+      {newUsersCount > 0 && (
+        <div className="mb-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-3xl flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             <span className="material-symbols-outlined text-blue-500">notifications_active</span>
+             <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
+               {newUsersCount} novo(s) usuário(s) registrado(s)!
+             </p>
+          </div>
+          <button 
+            onClick={() => {
+              localStorage.setItem('last_admin_check', new Date().toISOString());
+              setNewUsersCount(0);
+            }}
+            className="text-xs font-black text-blue-800 dark:text-blue-200 uppercase tracking-widest hover:underline"
+          >
+            Marcar como lido
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">

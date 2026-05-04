@@ -229,6 +229,31 @@ async function startServer() {
       }
     });
 
+    // Notify Admin of new user
+    app.post("/api/admin/notify-new-user", async (req, res) => {
+      try {
+        const { userName, userEmail } = req.body;
+        const adminEmail = process.env.ADMIN_EMAIL || process.env.SMTP_USER; // Default to SMTP user for admin alerts
+        if (!adminEmail) throw new Error("Admin email not configured");
+        
+        await sendRetentionEmail(adminEmail, "Novo usuário cadastrado!", `Um novo usuário se cadastrou no Planeventos:\n\nNome: ${userName}\nEmail: ${userEmail}`);
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Notify User of trial expiry
+    app.post("/api/user/notify-trial-expiry", async (req, res) => {
+      try {
+        const { userEmail, userName } = req.body;
+        await sendRetentionEmail(userEmail, "Seu período de teste expirou!", `Olá ${userName},\n\nSeu período de teste de 60 dias no Planeventos expirou. Você tem 7 dias para assinar ou seu histórico será apagado.`);
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     // Database Backup Endpoint
     app.get("/api/admin/backup", async (req, res) => {
       try {

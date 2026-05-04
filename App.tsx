@@ -40,15 +40,46 @@ const App: React.FC = () => {
   useEffect(() => { currentViewRef.current = currentView; }, [currentView]);
 
   useEffect(() => {
+    if (!user || user.role === 'admin' || user?.email === 'alessandromeirelles@gmail.com') {
+      setTrialDaysLeft(9999);
+      return;
+    }
+
     if (user?.trial_start_date) {
       const start = new Date(user.trial_start_date);
       const now = new Date();
-      const diffTime = Math.abs(now.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      const left = Math.max(0, 7 - diffDays);
-      setTrialDaysLeft(left);
+      const diffTime = now.getTime() - start.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      const totalTrialDays = 60;
+      const gracePeriodDays = 7;
+      
+      const daysLeft = Math.max(0, totalTrialDays - diffDays);
+      setTrialDaysLeft(daysLeft);
+
+      // Check for expiration/grace period notices
+      if (user.subscription_status === 'trial') {
+        if (diffDays >= totalTrialDays && diffDays < (totalTrialDays + gracePeriodDays)) {
+          // Grace period check
+          const graceDaysRemaining = (totalTrialDays + gracePeriodDays) - diffDays;
+          if (!user.emails_sent?.includes('grace_period_alert')) {
+             fetch('/api/user/notify-trial-expiry', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userEmail: user.email, userName: user.name })
+             }).catch(console.error);
+
+             updateDoc(doc(db, 'users', user.uid!), {
+               emails_sent: [...(user.emails_sent || []), 'grace_period_alert']
+             });
+          }
+        } else if (diffDays >= (totalTrialDays + gracePeriodDays)) {
+          // Expired
+          updateDoc(doc(db, 'users', user.uid!), { subscription_status: 'expired' });
+        }
+      }
     }
-  }, [user?.trial_start_date]);
+  }, [user?.trial_start_date, user?.subscription_status, user?.uid, user?.emails_sent, user?.role, user?.email]);
 
   useEffect(() => {
     initGoogleScripts((isInited) => {

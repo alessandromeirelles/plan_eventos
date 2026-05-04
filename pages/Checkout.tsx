@@ -132,7 +132,7 @@ const Checkout: React.FC<Props> = ({ plan, userId, onSuccess, onCancel }) => {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-6 bg-white dark:bg-background-dark border-t border-slate-100 dark:border-slate-800">
+      <div className="fixed bottom-0 left-0 right-0 p-6 bg-white dark:bg-background-dark border-t border-slate-100 dark:border-slate-800 z-50">
         <button 
           onClick={handlePayment}
           className="w-full bg-slate-900 dark:bg-white dark:text-slate-900 text-white font-black py-5 rounded-2xl shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all"
