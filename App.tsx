@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { auth, db } from './firebaseConfig';
+import { auth, db, handleFirestoreError, OperationType, app } from './firebaseConfig';
 import { onAuthStateChanged, updatePassword } from 'firebase/auth';
-import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, or } from 'firebase/firestore';
 import type { User, PlanEvent, Company, ViewState } from './types';
 import { EventStatus, InvoiceStatus } from './types';
 
@@ -90,41 +90,61 @@ const App: React.FC = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setIsLoadingAuth(true);
+      console.log('Auth state changed:', firebaseUser?.email, firebaseUser?.uid);
+      console.log('Firebase Project ID:', app.options.projectId);
+      
       if (firebaseUser) {
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const userDoc = await getDoc(userDocRef);
-        
-        if (userDoc.exists()) {
-          const userData = userDoc.data() as User;
-          setUser({ ...userData, uid: firebaseUser.uid });
-          if (userData.event_types) {
-            setEventTypes(userData.event_types);
+        try {
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as User;
+            console.log('User doc found:', userData);
+            const userWithCorrectRole = { 
+              ...userData, 
+              uid: firebaseUser.uid,
+              role: firebaseUser.email === 'alessandromeirelles@gmail.com' ? 'admin' : userData.role
+            };
+            setUser(userWithCorrectRole);
+            
+            // Also sync back to DB if role was wrong
+            if (firebaseUser.email === 'alessandromeirelles@gmail.com' && userData.role !== 'admin') {
+              await updateDoc(userDocRef, { role: 'admin' });
+            }
+
+            if (userData.event_types) {
+              setEventTypes(userData.event_types);
+            }
+            if (userData.expense_types) {
+              setExpenseTypes(userData.expense_types);
+            }
+            if (currentViewRef.current === 'LANDING' || currentViewRef.current === 'AUTH') {
+               if (userWithCorrectRole.role === 'admin') {
+                 setCurrentView('ADMIN_DASHBOARD');
+               } else {
+                 setCurrentView('DASHBOARD');
+               }
+            }
+          } else {
+            console.log('User doc not found, creating new one for:', firebaseUser.email);
+            // Create new user
+            const newUser: User = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              name: firebaseUser.displayName || 'Usuário',
+              photo: firebaseUser.photoURL || '',
+              subscription_status: 'trial',
+              trial_start_date: new Date().toISOString(),
+              event_types: ['Reunião', 'Casamento', 'Aniversário', 'Formatura', 'Corporativo'],
+              role: firebaseUser.email === 'alessandromeirelles@gmail.com' ? 'admin' : 'user'
+            };
+            await setDoc(userDocRef, newUser);
+            setUser(newUser);
+            setCurrentView('DASHBOARD');
           }
-          if (userData.expense_types) {
-            setExpenseTypes(userData.expense_types);
-          }
-          if (currentViewRef.current === 'LANDING' || currentViewRef.current === 'AUTH') {
-             if (userData.role === 'admin') {
-               setCurrentView('ADMIN_DASHBOARD');
-             } else {
-               setCurrentView('DASHBOARD');
-             }
-          }
-        } else {
-          // Create new user
-          const newUser: User = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            name: firebaseUser.displayName || 'Usuário',
-            photo: firebaseUser.photoURL || '',
-            subscription_status: 'trial',
-            trial_start_date: new Date().toISOString(),
-            event_types: ['Reunião', 'Casamento', 'Aniversário', 'Formatura', 'Corporativo'],
-            role: 'user'
-          };
-          await setDoc(userDocRef, newUser);
-          setUser(newUser);
-          setCurrentView('DASHBOARD');
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
         }
       } else {
         setUser(null);
@@ -137,25 +157,48 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!user?.email) return;
+    if (!user?.email || !user?.uid) return;
 
-    const eventsQuery = query(collection(db, 'events'), where('user_id', '==', user.email));
+    console.log('Setting up snapshots for:', user.email, user.uid);
+
+    // Query events where user_id is either their email OR their uid
+    const eventsQuery = query(
+      collection(db, 'events'), 
+      or(
+        where('user_id', '==', user.email),
+        where('user_id', '==', user.uid)
+      )
+    );
+    
     const unsubscribeEvents = onSnapshot(eventsQuery, (snapshot) => {
+      console.log(`Received events snapshot: ${snapshot.size} events`);
       const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PlanEvent));
       setEvents(eventsData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'events');
     });
 
-    const companiesQuery = query(collection(db, 'companies'), where('user_id', '==', user.email));
+    const companiesQuery = query(
+      collection(db, 'companies'), 
+      or(
+        where('user_id', '==', user.email),
+        where('user_id', '==', user.uid)
+      )
+    );
+    
     const unsubscribeCompanies = onSnapshot(companiesQuery, (snapshot) => {
+      console.log(`Received companies snapshot: ${snapshot.size} companies`);
       const companiesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
       setCompanies(companiesData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'companies');
     });
 
     return () => {
       unsubscribeEvents();
       unsubscribeCompanies();
     };
-  }, [user?.email]);
+  }, [user?.email, user?.uid]);
 
   const handleNavigate = (view: ViewState) => {
     setCurrentView(view);
@@ -173,16 +216,26 @@ const App: React.FC = () => {
   };
 
   const handleSaveEvent = async (event: PlanEvent) => {
-    if (!user?.email) return;
+    if (!user?.email && !user?.uid) return;
     
-    const eventData = { ...event, user_id: user.email };
-    if (event.id) {
-      await setDoc(doc(db, 'events', event.id), eventData as any, { merge: true });
-    } else {
-      const newDocRef = doc(collection(db, 'events'));
-      await setDoc(newDocRef, { ...eventData, id: newDocRef.id });
+    // Save with both identifiers if possible, or prefer UID for better consistency
+    const eventData = { 
+      ...event, 
+      user_id: user.uid || user.email,
+      owner_email: user.email // Add this for redundancy
+    };
+    
+    try {
+      if (event.id) {
+        await setDoc(doc(db, 'events', event.id), eventData as any, { merge: true });
+      } else {
+        const newDocRef = doc(collection(db, 'events'));
+        await setDoc(newDocRef, { ...eventData, id: newDocRef.id });
+      }
+      setCurrentView('EVENTS');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'events');
     }
-    setCurrentView('EVENTS');
   };
 
   const handleDeleteEvent = async (id: string) => {
@@ -209,16 +262,24 @@ const App: React.FC = () => {
   };
 
   const handleSaveCompany = async (company: Company) => {
-    if (!user?.email) return;
+    if (!user?.email && !user?.uid) return;
     
-    const companyData = { ...company, user_id: user.email };
-    if (company.id) {
-      await updateDoc(doc(db, 'companies', company.id), companyData as any);
-    } else {
-      const newDocRef = doc(collection(db, 'companies'));
-      await setDoc(newDocRef, { ...companyData, id: newDocRef.id });
+    const companyData = { 
+      ...company, 
+      user_id: user.uid || user.email 
+    };
+    
+    try {
+      if (company.id) {
+        await updateDoc(doc(db, 'companies', company.id), companyData as any);
+      } else {
+        const newDocRef = doc(collection(db, 'companies'));
+        await setDoc(newDocRef, { ...companyData, id: newDocRef.id });
+      }
+      setCurrentView('COMPANIES');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'companies');
     }
-    setCurrentView('COMPANIES');
   };
 
   const handleDeleteCompany = async (id: string) => {

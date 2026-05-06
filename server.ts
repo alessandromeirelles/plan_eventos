@@ -36,32 +36,30 @@ function getDb() {
         }
       }
 
-      console.log("[Firebase] Preparing private key...");
-      console.log("[Firebase] Key length:", privateKey.length);
-      console.log("[Firebase] Key starts with:", privateKey.substring(0, 30));
-      console.log("[Firebase] Key ends with:", privateKey.substring(privateKey.length - 30));
+      // If it looks like a valid PEM key already, use it as is.
+      const isAlreadyPEM = privateKey.includes('-----BEGIN PRIVATE KEY-----') && privateKey.includes('-----END PRIVATE KEY-----');
 
-      // If it already has headers, it should be fine
-      if (privateKey.startsWith('-----BEGIN PRIVATE KEY-----')) {
-          console.log("[Firebase] Key has headers.");
-          privateKey = privateKey.trim();
+      if (!isAlreadyPEM) {
+        console.log("[Firebase] Preparing private key (reformatting)...");
+        // Remove existing headers/footers and all whitespace to get raw base64
+        const rawBase64 = privateKey
+          .replace(/-----BEGIN PRIVATE KEY-----/g, '')
+          .replace(/-----END PRIVATE KEY-----/g, '')
+          .replace(/\s+/g, '');
+        
+        console.log("[Firebase] Raw base64 length:", rawBase64.length);
+        
+        // Re-add headers/footers with proper 64-character line breaks
+        const match = rawBase64.match(/.{1,64}/g);
+        if (match) {
+          privateKey = `-----BEGIN PRIVATE KEY-----\n${match.join('\n')}\n-----END PRIVATE KEY-----`;
+          console.log("[Firebase] Key headers and line breaks enforced.");
+        } else {
+          console.error("[Firebase] Failed to match base64 content.");
+        }
       } else {
-          console.log("[Firebase] Key missing headers, attempting to format...");
-          // Remove existing headers/footers and all whitespace to get raw base64
-          const rawBase64 = privateKey
-            .replace(/-----BEGIN PRIVATE KEY-----/g, '')
-            .replace(/-----END PRIVATE KEY-----/g, '')
-            .replace(/\s+/g, '');
-          
-          console.log("[Firebase] Raw base64 length:", rawBase64.length);
-          
-          // Re-add headers/footers with proper 64-character line breaks
-          const match = rawBase64.match(/.{1,64}/g);
-          if (match) {
-            privateKey = `-----BEGIN PRIVATE KEY-----\n${match.join('\n')}\n-----END PRIVATE KEY-----`;
-          } else {
-            console.error("[Firebase] Failed to match base64 content.");
-          }
+          console.log("[Firebase] Key already in valid PEM format.");
+          privateKey = privateKey.trim();
       }
       
       console.log("[Firebase] Final key format check:", privateKey.substring(0, 30), "...", privateKey.substring(privateKey.length - 30));

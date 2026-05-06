@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { db } from '../firebaseConfig';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../firebaseConfig';
+import { collection, getDocs, doc, updateDoc, query, limit } from 'firebase/firestore';
 
 interface Props {
   onLogout: () => void;
@@ -12,9 +12,12 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [newUsersCount, setNewUsersCount] = useState<number>(0);
+  const [totalEvents, setTotalEvents] = useState<number>(0);
+  const [totalCompanies, setTotalCompanies] = useState<number>(0);
   const [showRetentionModal, setShowRetentionModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [retentionResult, setRetentionResult] = useState<{message: string, isError: boolean} | null>(null);
+  const [extendingUserId, setExtendingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -31,17 +34,32 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
+      // Fetch users
       const usersRef = collection(db, 'users');
       const usersSnap = await getDocs(usersRef);
       const loadedUsers = usersSnap.docs.map(doc => {
         const data = doc.data() as User;
-        // Default status to active if not set
         if (!data.status) data.status = 'active';
-        return { ...data, id: doc.id }; // Add id to update later
+        return { ...data, id: doc.id };
       });
       setUsers(loadedUsers);
+
+      // Fetch global counts to verify connection
+      const eventsSnap = await getDocs(collection(db, 'events'));
+      setTotalEvents(eventsSnap.size);
+      
+      const companiesSnap = await getDocs(collection(db, 'companies'));
+      setTotalCompanies(companiesSnap.size);
+
+      console.log('Admin Dashboard Data:', {
+        users: loadedUsers.length,
+        events: eventsSnap.size,
+        companies: companiesSnap.size
+      });
+
     } catch (error) {
-      console.error("Erro ao carregar usuários:", error);
+      handleFirestoreError(error, OperationType.LIST, 'admin_check');
+      console.error("Erro ao carregar dados admin:", error);
     } finally {
       setLoading(false);
     }
@@ -54,6 +72,37 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
     } catch (error) {
       console.error("Erro ao atualizar status:", error);
       alert("Erro ao atualizar status do usuário.");
+    }
+  };
+
+  const updateUserSubscription = async (userId: string, action: string, days?: number) => {
+    try {
+      let updateData: any = {};
+
+      if (action === 'active') {
+        updateData = { subscription_status: 'active' };
+      } else if (action === 'inactive') {
+        updateData = { subscription_status: 'inactive' };
+      } else if (action === 'days' && days) {
+        const baseDate = new Date(); // Start from today
+        const startDate = new Date(baseDate);
+        startDate.setDate(startDate.getDate() + days);
+        updateData = { 
+            trial_start_date: startDate.toISOString(), 
+            subscription_status: 'trial' 
+        };
+      } else if (action === 'lifetime') {
+        updateData = { subscription_status: 'lifetime' };
+      }
+
+      await updateDoc(doc(db, 'users', userId), updateData);
+      
+      setUsers(users.map(u => (u as any).id === userId ? { ...u, ...updateData } : u));
+      setExtendingUserId(null);
+      alert(`Status atualizado com sucesso: ${action}.`);
+    } catch (error) {
+      console.error("Erro ao atualizar assinatura:", error);
+      alert("Erro ao atualizar assinatura.");
     }
   };
 
@@ -145,7 +194,7 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-4 mb-8">
         <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
           <span className="text-3xl font-black text-emerald-500">{activeUsers}</span>
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Ativos</span>
@@ -157,6 +206,14 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
         <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
           <span className="text-3xl font-black text-red-500">{deletedUsers}</span>
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Excluídos</span>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
+          <span className="text-3xl font-black text-brand-orange">{totalEvents}</span>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Eventos</span>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
+          <span className="text-3xl font-black text-brand-cyan">{totalCompanies}</span>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Clientes</span>
         </div>
       </div>
 
@@ -214,6 +271,41 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
                 </div>
 
                 <div className="flex gap-2 mt-1">
+                  <div className="flex-1 flex flex-col gap-1">
+                    {extendingUserId === user.id ? (
+                      <div className="flex flex-col gap-2 p-2 bg-slate-100 dark:bg-slate-800 rounded-xl animate-in fade-in slide-in-from-top-1">
+                        <p className="text-[9px] font-black uppercase text-slate-500 text-center">Gerenciar Assinatura:</p>
+                        <div className="grid grid-cols-2 gap-1">
+                          <button onClick={() => updateUserSubscription(user.id, 'active')} className="py-1 bg-emerald-600 text-white rounded text-[8px] font-black">Ativo</button>
+                          <button onClick={() => updateUserSubscription(user.id, 'inactive')} className="py-1 bg-slate-600 text-white rounded text-[8px] font-black">Inativo</button>
+                          {[30, 60, 90].map(days => (
+                            <button
+                              key={days}
+                              onClick={() => updateUserSubscription(user.id, 'days', days)}
+                              className="py-1 bg-brand-cyan text-white rounded text-[8px] font-black"
+                            >
+                              +{days}d
+                            </button>
+                          ))}
+                          <button onClick={() => updateUserSubscription(user.id, 'lifetime')} className="py-1 bg-purple-600 text-white rounded text-[8px] font-black">Vitalício</button>
+                        </div>
+                        <button 
+                          onClick={() => setExtendingUserId(null)}
+                          className="text-[8px] font-bold text-slate-400 uppercase hover:text-slate-600"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => setExtendingUserId(user.id)}
+                        className="w-full py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"
+                      >
+                        Extender Trial
+                      </button>
+                    )}
+                  </div>
+                  
                   {user.status !== 'active' && (
                     <button 
                       onClick={() => updateUserStatus(user.id, 'active')}

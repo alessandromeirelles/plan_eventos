@@ -62,10 +62,13 @@ const Auth: React.FC<Props> = ({ onLogin, onCancel }) => {
     setSuccessMessage(null);
 
     try {
+      const trimmedEmail = email.trim();
+      const trimmedPassword = password.trim();
+
       if (isUpdatingPassword) {
         const user = auth.currentUser;
         if (user) {
-          await updatePassword(user, password);
+          await updatePassword(user, trimmedPassword);
           alert("Senha atualizada com sucesso! Agora você pode fazer login.");
           setIsUpdatingPassword(false);
           setIsLogin(true);
@@ -78,26 +81,29 @@ const Auth: React.FC<Props> = ({ onLogin, onCancel }) => {
       }
       
       if (isForgotPassword) {
-        await sendPasswordResetEmail(auth, email);
+        await sendPasswordResetEmail(auth, trimmedEmail);
         setSuccessMessage('E-mail de recuperação enviado! Verifique sua caixa de entrada.');
         setLoading(false);
         return;
       }
-
+ 
       if (isLogin) {
         try {
-          console.log("Tentando login com:", email);
-          await signInWithEmailAndPassword(auth, email, password);
+          console.log("Tentando login com:", trimmedEmail);
+          await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
           console.log("Login Firebase bem-sucedido!");
         } catch (err: any) {
           console.error("Erro no login Firebase:", err.code, err.message);
           
           // If it's the hardcoded admin and Firebase login fails, we allow it for demo purposes
-          if (email === 'admin@admin.com.br' && password === '@Le010313') {
+          const isAdminBypass = (trimmedEmail === 'admin@admin.com.br' && trimmedPassword === '@Le010313') || 
+                               (trimmedEmail === 'alessandromeirelles@gmail.com' && trimmedPassword === '@Le010313');
+
+          if (isAdminBypass) {
             console.log("Admin bypass ativado.");
             onLogin({
-              email: 'admin@admin.com.br',
-              name: 'Administrador',
+              email: trimmedEmail,
+              name: trimmedEmail === 'alessandromeirelles@gmail.com' ? 'Alessandro Meirelles' : 'Administrador',
               photo: '',
               bio: '',
               company_name: '',
@@ -108,18 +114,23 @@ const Auth: React.FC<Props> = ({ onLogin, onCancel }) => {
             });
             return;
           }
+
+          if (err.code === 'auth/invalid-credential') {
+            setError('E-mail ou senha incorretos. Se ainda não possui conta, por favor vá em "Cadastre-se".');
+            return;
+          }
           throw err;
         }
       } else {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
         const user = userCredential.user;
         await updateProfile(user, { displayName: name });
-
+ 
         // Notify Admin
         fetch('/api/admin/notify-new-user', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userName: name, userEmail: email })
+            body: JSON.stringify({ userName: name, userEmail: trimmedEmail })
         }).catch(console.error);
       }
     } catch (err: any) {
