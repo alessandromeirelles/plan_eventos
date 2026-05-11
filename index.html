@@ -37,10 +37,20 @@
                             '0%, 100%': { transform: 'rotate(0deg)' },
                             '10%, 30%, 50%, 70%, 90%': { transform: 'rotate(-10deg)' },
                             '20%, 40%, 60%, 80%': { transform: 'rotate(10deg)' },
+                        },
+                        'pulse-subtle': {
+                            '0%, 100%': { opacity: '1', transform: 'scale(1)' },
+                            '50%': { opacity: '0.9', transform: 'scale(0.99)' },
+                        },
+                        'bounce-subtle': {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-2px)' },
                         }
                     },
                     animation: {
                         swing: 'swing 2s ease-in-out infinite',
+                        'pulse-subtle': 'pulse-subtle 3s ease-in-out infinite',
+                        'bounce-subtle': 'bounce-subtle 2s ease-in-out infinite',
                     }
                 },
             },

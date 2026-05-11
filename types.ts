@@ -50,6 +50,7 @@ export interface PlanEvent {
   created_at?: string;
   updated_at?: string;
   paid_at?: string;
+  receipt_date?: string;
   invoice_issued_at?: string;
   google_calendar_event_id?: string;
 }

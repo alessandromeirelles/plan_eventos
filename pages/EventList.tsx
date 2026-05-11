@@ -357,15 +357,40 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
 
             const totalExpenses = (event.expenses || []).reduce((acc, exp) => acc + (exp.value || 0), 0);
 
+            const getDelayInfo = (receiptDate?: string, status?: EventStatus) => {
+              if (status === EventStatus.PAID || !receiptDate) return null;
+              
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const deadline = new Date(receiptDate);
+              deadline.setHours(0, 0, 0, 0);
+              const deadlineDate = new Date(receiptDate + 'T12:00:00'); // Use noon to avoid timezone shifts
+              
+              if (today > deadlineDate) {
+                const diffTime = today.getTime() - deadlineDate.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                return diffDays;
+              }
+              return null;
+            };
+
+            const delayDays = getDelayInfo(event.receipt_date, event.status);
+
             return (
-            <div key={event.id} className="rounded-xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md flex flex-col relative overflow-hidden" style={{ backgroundColor: companyColor ? `${companyColor}20` : 'var(--bg-white)', borderColor: companyColor ? `${companyColor}40` : undefined }}>
-              <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: companyColor || '#e2e8f0' }}></div>
+            <div key={event.id} className={`rounded-xl p-4 border shadow-sm transition-all hover:shadow-md flex flex-col relative overflow-hidden ${delayDays ? 'ring-2 ring-red-500 ring-offset-2 dark:ring-offset-background-dark animate-pulse-subtle' : ''}`} style={{ backgroundColor: companyColor ? `${companyColor}20` : 'var(--bg-white)', borderColor: delayDays ? '#ef4444' : (companyColor ? `${companyColor}40` : undefined) }}>
+              <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${delayDays ? 'bg-red-500' : ''}`} style={{ backgroundColor: delayDays ? '#ef4444' : (companyColor || '#e2e8f0') }}></div>
               <div className="flex justify-between items-start mb-2 pl-2">
                 <div className="flex flex-col">
-                  <h3 className="font-bold text-slate-800 dark:text-white">{event.title}</h3>
-                  <span className="text-xs text-slate-500 font-medium">{company?.name || 'Empresa não encontrada'}</span>
+                  <h3 className="font-bold text-slate-800 dark:text-white uppercase text-xs tracking-tight">{event.title}</h3>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{company?.name || 'Empresa não encontrada'}</span>
                 </div>
                 <div className="flex flex-col items-end gap-1">
+                  {delayDays && (
+                    <div className="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 animate-bounce-subtle">
+                      <span className="material-symbols-outlined text-[10px]">timer</span>
+                      {delayDays}d ATRASADO
+                    </div>
+                  )}
                   <div className="relative group">
                     <select 
                       value={event.status}
@@ -442,6 +467,10 @@ const EventList: React.FC<Props> = ({ events, companies, eventTypes, onDelete, o
                 <div className="flex items-center gap-2 text-slate-500">
                   <span className="material-symbols-outlined text-sm">calendar_month</span>
                   <span>{event.date.split('-').reverse().join('/')} {event.time ? `- ${event.time}` : ''}</span>
+                </div>
+                <div className={`flex items-center gap-2 text-sm font-medium ${delayDays ? 'text-red-500' : 'text-slate-500'}`}>
+                  <span className="material-symbols-outlined text-sm">account_balance_wallet</span>
+                  <span>Recebimento: {event.receipt_date ? event.receipt_date.split('-').reverse().join('/') : '--/--/----'}</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-500">
                   <span className="material-symbols-outlined text-sm">business</span>

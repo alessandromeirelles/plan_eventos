@@ -41,7 +41,8 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
     location: initialData?.location || '',
     invoice_status: initialData?.invoice_status || InvoiceStatus.PENDING,
     invoice_number: initialData?.invoice_number || '',
-    invoice_url: initialData?.invoice_url || ''
+    invoice_url: initialData?.invoice_url || '',
+    receipt_date: initialData?.receipt_date || ''
   });
 
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
@@ -217,6 +218,19 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
                   onChange={e => setFormData({...formData, time: e.target.value})}
                 />
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                Data Prevista de Recebimento
+                <span className="material-symbols-outlined text-xs text-brand-orange">info</span>
+              </label>
+              <input 
+                type="date"
+                className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary dark:text-white"
+                value={formData.receipt_date}
+                onChange={e => setFormData({...formData, receipt_date: e.target.value})}
+              />
             </div>
             
             <div className="grid grid-cols-2 gap-4">

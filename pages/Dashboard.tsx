@@ -610,13 +610,28 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
           {upcomingEvents.slice(0, 4).map((event) => {
             const logoUrl = getCompanyLogo(event.company_id);
             const totalExpenses = (event.expenses || []).reduce((acc, exp) => acc + (exp.value || 0), 0);
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const receiptDate = event.receipt_date ? new Date(event.receipt_date + 'T12:00:00') : null;
+            const isLate = event.status !== EventStatus.PAID && receiptDate && today > receiptDate;
+            const delayDays = isLate && receiptDate ? Math.ceil((today.getTime() - receiptDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+
             return (
-              <div key={event.id} onClick={() => onNavigate('EVENTS')} className="flex items-center gap-4 p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-50 dark:border-slate-800 shadow-sm cursor-pointer group hover:border-brand-orange/30 transition-all">
+              <div key={event.id} onClick={() => onNavigate('EVENTS')} className={`flex items-center gap-4 p-5 rounded-3xl bg-white dark:bg-slate-900 border ${isLate ? 'border-red-500 shadow-red-500/10' : 'border-slate-50 dark:border-slate-800'} shadow-sm cursor-pointer group hover:border-brand-orange/30 transition-all relative overflow-hidden`}>
+                {isLate && <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500"></div>}
                 <div className="size-16 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center overflow-hidden border border-slate-100 dark:border-slate-700">
                   {logoUrl ? <img src={logoUrl} className="w-full h-full object-cover" alt="Logo" /> : <span className="material-symbols-outlined text-brand-navy/20 text-3xl">{getCompanyIcon(event.company_id)}</span>}
                 </div>
                 <div className="flex-1 overflow-hidden">
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">{event.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">{event.title}</h3>
+                    {isLate && (
+                      <span className="shrink-0 bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">
+                        {delayDays}d ATRASADO
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-3 mt-1">
                     <span className="text-[10px] font-black text-slate-400 uppercase">{event.type}</span>
                     <span className="text-[10px] font-black text-brand-orange">
@@ -631,9 +646,17 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
                   <div className="flex items-center gap-1 mt-1.5 text-slate-500">
                     <span className="material-symbols-outlined text-[10px]">calendar_month</span>
                     <span className="text-[10px] font-bold uppercase tracking-widest">{event.date.split('-').reverse().join('/')}</span>
+                    {event.receipt_date && (
+                      <>
+                        <span className="mx-1">•</span>
+                        <span className={`text-[10px] font-bold uppercase tracking-widest ${isLate ? 'text-red-500' : ''}`}>
+                          Recebimento: {event.receipt_date.split('-').reverse().join('/')}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
-                <span className="material-symbols-outlined text-slate-200 group-hover:text-brand-orange transition-colors">arrow_forward_ios</span>
+                <span className={`material-symbols-outlined ${isLate ? 'text-red-500' : 'text-slate-200'} group-hover:text-brand-orange transition-colors`}>arrow_forward_ios</span>
               </div>
             );
           })}
