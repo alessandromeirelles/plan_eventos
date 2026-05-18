@@ -6,7 +6,7 @@ import { PlanEvent, User } from './types';
 declare const gapi: any;
 declare const google: any;
 
-const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '810529146566-3v71cbn992oil13l0vnnjci0kc7cojqj.apps.googleusercontent.com';
+const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '730590492699-6oo01g98sg65hnkhvb8fpa5k8024qmna.apps.googleusercontent.com';
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || '';
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
