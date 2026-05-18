@@ -213,8 +213,10 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
     if (!user?.uid) return;
     setIsConnecting(true);
     try {
-      const origin = window.location.origin;
-      const redirectUri = `${origin}/api/auth/google/callback`;
+      const urlObj = new URL(window.location.origin);
+      // Remove 'www.' from hostname if present and construct origin manually
+      const hostname = urlObj.hostname.replace(/^www\./, '');
+      const redirectUri = `${urlObj.protocol}//${hostname}/api/auth/google/callback`;
       console.log('[Google Auth] Initiating connection', { userId: user.uid, redirectUri });
       
       const response = await fetch(`/api/auth/google/url?userId=${user.uid}&redirectUri=${encodeURIComponent(redirectUri)}`);

@@ -47,6 +47,11 @@ const Landing: React.FC<Props> = ({ onNavigate }) => {
             <span className="material-symbols-outlined text-3xl">edit_square</span>
           </div>
         </div>
+        <footer style="margin-top:40px;text-align:center;">
+          <a href="https://app.motivaecomunica.com.br/privacy.html">
+            Política de Privacidade
+          </a>
+        </footer>
       </main>
     </div>
   );
