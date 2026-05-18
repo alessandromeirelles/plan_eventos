@@ -87,13 +87,13 @@ const App: React.FC = () => {
     });
   }, []);
 
-  useEffect(() => {
-    if (googleScriptsLoaded && user?.google_calendar_connected) {
-      import('./googleCalendarService').then(({ getAccessToken }) => {
-        getAccessToken(false).catch(console.error);
-      });
-    }
-  }, [googleScriptsLoaded, user?.google_calendar_connected]);
+  // useEffect(() => {
+  //   if (googleScriptsLoaded && user?.google_calendar_connected) {
+  //     import('./googleCalendarService').then(({ getAccessToken }) => {
+  //       getAccessToken(false).catch(console.error);
+  //     });
+  //   }
+  // }, [googleScriptsLoaded, user?.google_calendar_connected]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
