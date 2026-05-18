@@ -328,27 +328,21 @@ async function startServer() {
           clientIdConfigured: !!process.env.GOOGLE_CLIENT_ID, 
           clientSecretConfigured: !!process.env.GOOGLE_CLIENT_SECRET 
         });
-        return res.status(500).json({ error: "Google credentials not configured" });
+        return res.status(500).json({ error: "Google credentials not configured: " + (!clientId ? "CLIENT_ID " : "") + (!clientSecret ? "CLIENT_SECRET" : "") });
       }
 
-      console.log('[Google Auth] Generating OAuth2 client with redirectUri:', redirectUri);
       const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri as string);
       const stateStr = Buffer.from(JSON.stringify({ userId, redirectUri })).toString('base64');
-      
-      try {
-        const url = oauth2Client.generateAuthUrl({
-          access_type: 'offline',
-          scope: ['https://www.googleapis.com/auth/calendar.events'],
-          prompt: 'consent',
-          state: stateStr,
-        });
 
-        console.log('[Google Auth] URL generated successfully.');
-        res.json({ url });
-      } catch (err: any) {
-        console.error('[Google Auth] Error generating URL:', err);
-        res.status(500).json({ error: "Failed to generate Auth URL" });
-      }
+      console.log(`[Google Auth] Redirecting to Google with URI: ${redirectUri}`);
+      const url = oauth2Client.generateAuthUrl({
+        access_type: 'offline',
+        scope: ['https://www.googleapis.com/auth/calendar.events'],
+        prompt: 'consent',
+        state: stateStr,
+      });
+
+      res.json({ url });
     });
 
     app.get(["/api/auth/google/callback", "/api/auth/google/callback/"], async (req, res) => {
@@ -712,7 +706,7 @@ async function startServer() {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://0.0.0.0:${PORT}`);
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Fatal error during server startup:", error);
     process.exit(1);
   }
