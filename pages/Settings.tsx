@@ -227,6 +227,38 @@ const Settings: React.FC<Props> = ({ user, onUpdateUser, onChangePassword, onNav
           </div>
         </section>
 
+        {/* Integrações */}
+        <section className="space-y-4">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Integrações</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] p-6 shadow-sm border border-slate-100 dark:border-slate-800 space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-black text-brand-navy dark:text-white uppercase">Google Calendar</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  {user.google_calendar_connected ? 'Conectado' : 'Não conectado'}
+                </p>
+              </div>
+              <button 
+                onClick={async () => {
+                  const { signInWithGoogle } = await import('../googleCalendarService');
+                  const googleUser = await signInWithGoogle();
+                  if (googleUser) {
+                    await onUpdateUser({...user, google_calendar_connected: true});
+                    onShowSuccess('Conectado ao Google Calendar com sucesso!');
+                  }
+                }}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${
+                  user.google_calendar_connected 
+                    ? 'bg-emerald-100 text-emerald-600' 
+                    : 'bg-brand-orange text-white shadow-lg active:scale-95'
+                }`}
+              >
+                {user.google_calendar_connected ? 'Reconectar' : 'Conectar'}
+              </button>
+            </div>
+          </div>
+        </section>
+
         {/* Notificações */}
         <section className="space-y-4">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Notificações</h3>
@@ -388,6 +420,36 @@ const Settings: React.FC<Props> = ({ user, onUpdateUser, onChangePassword, onNav
           >
             <span className="material-symbols-outlined">logout</span>
             <span>Sair da Conta</span>
+          </button>
+
+          <button 
+            onClick={async () => {
+              try {
+                const response = await fetch('/api/user/backup', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ userId: user.uid })
+                });
+
+                if (!response.ok) throw new Error('Erro ao solicitar backup');
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `backup-${user.name || 'dados'}.json`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+              } catch (error) {
+                alert('Erro ao realizar backup');
+              }
+            }}
+            className="w-full bg-emerald-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 active:scale-95 transition-all"
+          >
+            <span className="material-symbols-outlined">download</span>
+            <span>Baixar Backup dos Dados</span>
           </button>
         </section>
       </main>

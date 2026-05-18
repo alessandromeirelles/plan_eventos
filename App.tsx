@@ -51,7 +51,7 @@ const App: React.FC = () => {
       const diffTime = now.getTime() - start.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       
-      const totalTrialDays = 60;
+      const totalTrialDays = 90;
       const gracePeriodDays = 7;
       
       const daysLeft = Math.max(0, totalTrialDays - diffDays);
@@ -86,6 +86,14 @@ const App: React.FC = () => {
       setGoogleScriptsLoaded(isInited);
     });
   }, []);
+
+  useEffect(() => {
+    if (googleScriptsLoaded && user?.google_calendar_connected) {
+      import('./googleCalendarService').then(({ getAccessToken }) => {
+        getAccessToken(false).catch(console.error);
+      });
+    }
+  }, [googleScriptsLoaded, user?.google_calendar_connected]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -231,6 +239,12 @@ const App: React.FC = () => {
       } else {
         const newDocRef = doc(collection(db, 'events'));
         await setDoc(newDocRef, { ...eventData, id: newDocRef.id });
+        
+        // Sincronizar com Google Calendar se conectado
+        if (user.google_calendar_connected) {
+          const { syncEventToGoogle } = await import('./googleCalendarService');
+          await syncEventToGoogle({ ...eventData, id: newDocRef.id });
+        }
       }
       setCurrentView('EVENTS');
     } catch (error) {

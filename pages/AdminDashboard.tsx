@@ -111,7 +111,7 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
   const deletedUsers = users.filter(u => u.status === 'deleted').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-background-dark p-6 animate-in fade-in duration-500">
+    <div className="min-h-screen bg-slate-50 dark:bg-background-dark p-6 pb-32 animate-in fade-in duration-500">
       <header className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-4">
           <button 
@@ -247,7 +247,19 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2 text-[10px] text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl">
+                <div className="grid grid-cols-5 gap-2 text-[10px] text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl">
+                  <div>
+                    <span className="font-bold uppercase">Trial:</span><br/>
+                    {(() => {
+                      if (!user.trial_start_date) return 'N/A';
+                      const start = new Date(user.trial_start_date);
+                      const now = new Date();
+                      const diffTime = now.getTime() - start.getTime();
+                      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                      const daysLeft = Math.max(0, 90 - diffDays);
+                      return `${daysLeft} dias`;
+                    })()}
+                  </div>
                   <div>
                     <span className="font-bold uppercase">Inscrição:</span><br/>
                     {user.trial_start_date ? new Date(user.trial_start_date).toLocaleDateString('pt-BR') : 'N/A'}

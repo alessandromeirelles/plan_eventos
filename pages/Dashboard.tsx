@@ -218,11 +218,25 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
       console.log('[Google Auth] Initiating connection', { userId: user.uid, redirectUri });
       
       const response = await fetch(`/api/auth/google/url?userId=${user.uid}&redirectUri=${encodeURIComponent(redirectUri)}`);
+      const contentType = response.headers.get('content-type');
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get auth URL');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to get auth URL');
+        } else {
+          const text = await response.text();
+          console.error('[Google Auth] Non-JSON error response:', text);
+          throw new Error(`Erro do servidor (${response.status}): O servidor não retornou JSON. Verifique se o GOOGLE_CLIENT_ID está configurado corretamente.`);
+        }
       }
       
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('[Google Auth] Expected JSON but got:', text);
+        throw new Error('O servidor retornou uma resposta inválida (não é JSON).');
+      }
+
       const { url } = await response.json();
       
       const authWindow = window.open(
@@ -263,8 +277,15 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
       }
     };
     window.addEventListener('message', handleMessage);
+    
+    // Auto-prompt calendar connection if user is logged in and not connected
+    if (user && !user.google_calendar_connected && !sessionStorage.getItem('calendar_prompted')) {
+      sessionStorage.setItem('calendar_prompted', 'true');
+      setTimeout(handleConnectGoogleCalendar, 1000);
+    }
+
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [user]);
 
   return (
     <div className="pb-32 animate-in fade-in duration-700 relative">
@@ -465,6 +486,15 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
                       </div>
                       <span className="text-[10px] font-black uppercase tracking-widest">Agenda Conectada</span>
                     </div>
+                  <button 
+                      onClick={async () => {
+                        window.location.href = '/api/admin/backup';
+                      }}
+                      className="mt-1 text-[9px] font-bold text-slate-500 hover:text-slate-700 hover:underline flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-xs">download</span>
+                      Backup dos Dados
+                    </button>
                     <button 
                       onClick={async () => {
                         if (!user?.uid) return;
@@ -474,11 +504,18 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ userId: user.uid })
                           });
+                          
+                          if (!res.ok) {
+                            const text = await res.text();
+                            console.error('Server response:', text);
+                            throw new Error(`Erro ${res.status}: ${res.statusText}`);
+                          }
+                          
                           const data = await res.json();
                           if (data.success) {
                             alert(`${data.syncedCount} eventos sincronizados com sucesso!`);
                           } else {
-                            throw new Error(data.error);
+                            throw new Error(data.error || 'Erro desconhecido ao sincronizar');
                           }
                         } catch (err: any) {
                           alert('Erro ao sincronizar eventos: ' + err.message);

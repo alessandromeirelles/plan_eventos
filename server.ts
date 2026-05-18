@@ -18,49 +18,33 @@ function getDb() {
     if (apps.length === 0) {
       let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
       
-      // Remove surrounding quotes
-      privateKey = privateKey.replace(/^["']|["']$/g, '');
-      
-      // Handle escaped newlines
-      privateKey = privateKey.replace(/\\n/g, '\n');
-      
-      // Check if it's a JSON string (downloaded service account file)
+      // Log for debugging
+      console.log("[Firebase] Initial private key length:", privateKey.length);
+
+      // JSON parsing if it's a full service account file content
       if (privateKey.trim().startsWith('{')) {
         try {
           const json = JSON.parse(privateKey);
           if (json.private_key) {
             privateKey = json.private_key;
+            console.log("[Firebase] Extracted private key from JSON.");
           }
         } catch (e) {
           console.error("[Firebase] Error parsing private key as JSON:", e);
         }
       }
-
-      // If it looks like a valid PEM key already, use it as is.
-      const isAlreadyPEM = privateKey.includes('-----BEGIN PRIVATE KEY-----') && privateKey.includes('-----END PRIVATE KEY-----');
-
-      if (!isAlreadyPEM) {
-        console.log("[Firebase] Preparing private key (reformatting)...");
-        // Remove existing headers/footers and all whitespace to get raw base64
-        const rawBase64 = privateKey
-          .replace(/-----BEGIN PRIVATE KEY-----/g, '')
-          .replace(/-----END PRIVATE KEY-----/g, '')
-          .replace(/\s+/g, '');
-        
-        console.log("[Firebase] Raw base64 length:", rawBase64.length);
-        
-        // Re-add headers/footers with proper 64-character line breaks
-        const match = rawBase64.match(/.{1,64}/g);
-        if (match) {
-          privateKey = `-----BEGIN PRIVATE KEY-----\n${match.join('\n')}\n-----END PRIVATE KEY-----`;
-          console.log("[Firebase] Key headers and line breaks enforced.");
-        } else {
-          console.error("[Firebase] Failed to match base64 content.");
-        }
-      } else {
-          console.log("[Firebase] Key already in valid PEM format.");
-          privateKey = privateKey.trim();
+      
+      // Remove surrounding quotes if present and handle escaped newlines
+      privateKey = privateKey.replace(/^["']|["']$/g, '').replace(/\\n/g, '\n');
+      
+      // If still missing PEM headers, wrap it (it might be just raw base64 key)
+      if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+        console.log("[Firebase] PEM headers missing, wrapping...");
+        const match = privateKey.replace(/\s+/g, '').match(/.{1,64}/g);
+        privateKey = `-----BEGIN PRIVATE KEY-----\n${match ? match.join('\n') : privateKey}\n-----END PRIVATE KEY-----`;
       }
+      
+      privateKey = privateKey.trim();
       
       console.log("[Firebase] Final key format check:", privateKey.substring(0, 30), "...", privateKey.substring(privateKey.length - 30));
       console.log("[Firebase] Private key prepared.");
@@ -158,6 +142,11 @@ async function startServer() {
     app.use(cors());
     app.use(express.urlencoded({ extended: true }));
     app.use(express.json());
+
+    app.use((req, res, next) => {
+      console.log(`[Request] ${req.method} ${req.url}`);
+      next();
+    });
 
     app.get("/api/health", (req, res) => {
       res.json({ status: "ok", timestamp: new Date().toISOString() });
@@ -287,6 +276,40 @@ async function startServer() {
       }
     });
 
+    app.post("/api/user/backup", async (req, res) => {
+      try {
+        const { userId } = req.body;
+        console.log(`[Backup] Starting user backup for: ${userId}`);
+        const firestore = getDb();
+        const userDoc = await firestore.collection("users").doc(userId).get();
+        if (!userDoc.exists) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        
+        const backupData: any = {
+            user: { id: userDoc.id, ...userDoc.data() }
+        };
+        
+        // Fetch User's Companies
+        const companiesSnap = await firestore.collection("companies").where("user_id", "==", userId).get();
+        backupData["companies"] = companiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Fetch User's Events
+        const eventsSnap = await firestore.collection("events").where("user_id", "==", userId).get();
+        backupData["events"] = eventsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const filename = `backup-user-${userId}-${timestamp}.json`;
+
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+        res.send(JSON.stringify(backupData, null, 2));
+      } catch (error: any) {
+        console.error("[Backup] Error creating user backup:", error);
+        res.status(500).json({ error: error.message || "Unknown error" });
+      }
+    });
+
     // Google OAuth Endpoints
     app.get("/api/auth/google/url", (req, res) => {
       const { userId, redirectUri } = req.query;
@@ -294,14 +317,18 @@ async function startServer() {
       console.log(`[Google Auth] Generating URL for userId: ${userId}, redirectUri: ${redirectUri}`);
 
       if (!userId || !redirectUri) {
+        console.error("[Google Auth] Missing userId or redirectUri in request");
         return res.status(400).json({ error: "Missing userId or redirectUri" });
       }
 
       const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
       const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
       if (!clientId || !clientSecret) {
-        console.error('[Google Auth] Missing credentials:', { clientId: !!clientId, clientSecret: !!clientSecret });
-        return res.status(500).json({ error: "Google credentials not configured" });
+        console.error('[Google Auth] Missing credentials:', { 
+          clientIdConfigured: !!process.env.GOOGLE_CLIENT_ID, 
+          clientSecretConfigured: !!process.env.GOOGLE_CLIENT_SECRET 
+        });
+        return res.status(500).json({ error: "Google credentials not configured: " + (!clientId ? "CLIENT_ID " : "") + (!clientSecret ? "CLIENT_SECRET" : "") });
       }
 
       const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri as string);
@@ -429,20 +456,33 @@ async function startServer() {
     });
 
     app.post("/api/calendar/sync-all", async (req, res) => {
+      console.log("[Calendar] Sync all request received for:", req.body);
       try {
         const { userId } = req.body;
-        if (!userId) return res.status(400).json({ error: "Missing userId" });
+        if (!userId) {
+          console.warn("[Calendar] Sync all request missing userId");
+          return res.status(400).json({ error: "Missing userId" });
+        }
 
         const firestore = getDb();
+        console.log("[Calendar] Sync all - fetching user doc for:", userId);
         const userDoc = await firestore.collection("users").doc(userId).get();
-        if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
+        if (!userDoc.exists) {
+          console.warn("[Calendar] User not found:", userId);
+          return res.status(404).json({ error: "User not found" });
+        }
         
         const userData = userDoc.data();
         const userEmail = userData?.email;
-        if (!userEmail) return res.status(400).json({ error: "User email not found" });
+        if (!userEmail) {
+          console.warn("[Calendar] User email not found for:", userId);
+          return res.status(400).json({ error: "User email not found" });
+        }
 
+        console.log("[Calendar] Sync all - fetching events for:", userEmail);
         const eventsSnap = await firestore.collection("events").where("user_id", "==", userEmail).get();
         const events = eventsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log(`[Calendar] Sync all - found ${events.length} events to sync`);
 
         const auth = await getGoogleAuthClient(userId);
         const calendar = google.calendar({ version: 'v3', auth });
@@ -452,6 +492,7 @@ async function startServer() {
           // Skip if already has google event id (optional: could update instead)
           if (event.google_calendar_event_id) continue;
 
+          console.log(`[Calendar] Sync all - syncing event: ${event.id}`);
           const startTime = event.time || '09:00';
           const [h, m] = startTime.split(':').map(Number);
           let endH = h + 1;
@@ -493,10 +534,11 @@ async function startServer() {
           }
         }
 
+        console.log(`[Calendar] Sync all complete. Synced: ${syncedCount}`);
         res.json({ success: true, syncedCount });
       } catch (error: any) {
-        console.error("Error syncing all events:", error);
-        res.status(500).json({ error: error.message });
+        console.error("[Calendar] Error syncing all events:", error);
+        res.status(500).json({ error: error.message || "Unknown error" });
       }
     });
 
