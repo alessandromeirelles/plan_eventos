@@ -117,33 +117,13 @@ export const signInWithGoogle = async (): Promise<User | null> => {
   }
 };
 
-export const syncEventToGoogle = async (event: PlanEvent): Promise<boolean> => {
+export const syncEventToGoogle = async (event: PlanEvent, userId: string): Promise<boolean> => {
   try {
-    const token = await getAccessToken(true);
-    
-    const googleEvent = {
-      'summary': event.title,
-      'location': event.location || 'Local a definir',
-      'description': `Evento PlanEventos. Tipo: ${event.type}. R$ ${event.value}`,
-      'start': {
-        'date': event.date,
-        'timeZone': 'America/Sao_Paulo'
-      },
-      'end': {
-        'date': event.date,
-        'timeZone': 'America/Sao_Paulo'
-      },
-    };
-
-    const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events`, {
+    const response = await fetch('/api/calendar/event', {
       method: 'POST',
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(googleEvent)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, event })
     });
-
     return response.ok;
   } catch (err) {
     console.error("Sync failed", err);

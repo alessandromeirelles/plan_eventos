@@ -243,7 +243,7 @@ const App: React.FC = () => {
         // Sincronizar com Google Calendar se conectado
         if (user.google_calendar_connected) {
           const { syncEventToGoogle } = await import('./googleCalendarService');
-          await syncEventToGoogle({ ...eventData, id: newDocRef.id });
+          await syncEventToGoogle({ ...eventData, id: newDocRef.id }, user.uid!);
         }
       }
       setCurrentView('EVENTS');
