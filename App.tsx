@@ -212,6 +212,7 @@ const App: React.FC = () => {
   }, [user?.email, user?.uid]);
 
   const handleNavigate = (view: ViewState) => {
+    if (view === 'NEW_EVENT') setEditingEvent(undefined);
     setCurrentView(view);
   };
 

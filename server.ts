@@ -168,9 +168,11 @@ const createHtmlBody = (message: string) => `
 `;
 
 async function processRetention(): Promise<{processed: number, sent: number}> {
+  console.log("[Retention] Starting processRetention loop...");
   const firestore = getDb();
   const usersSnap = await firestore.collection("users").get();
   const docs = usersSnap.docs || [];
+  console.log(`[Retention] Found ${docs.length} users to process.`);
   const now = new Date();
   let processedCount = 0;
   let emailsSentCount = 0;
@@ -179,6 +181,7 @@ async function processRetention(): Promise<{processed: number, sent: number}> {
     const userData = doc.data();
     if (!userData.email || !userData.last_activity) continue;
 
+    console.log(`[Retention] Processing user: ${userData.email}`);
     const lastActivity = new Date(userData.last_activity);
     const diffDays = Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
     const emailsSent = userData.emails_sent || [];
@@ -221,10 +224,13 @@ async function processRetention(): Promise<{processed: number, sent: number}> {
     }
 
     if (key) {
+      console.log(`[Retention] Sending ${key} email to ${userData.email}`);
       await sendRetentionEmail(userData.email, subject, text, html);
+      console.log(`[Retention] Email sent successfully.`);
       await doc.ref.update({
         emails_sent: admin.firestore.FieldValue.arrayUnion(key)
       });
+      console.log(`[Retention] User updated with ${key}.`);
       emailsSentCount++;
       
       // Log the sent email securely
@@ -236,9 +242,11 @@ async function processRetention(): Promise<{processed: number, sent: number}> {
         subject: subject,
         sent_at: admin.firestore.FieldValue.serverTimestamp()
       });
+      console.log(`[Retention] Retention log added.`);
     }
     processedCount++;
   }
+  console.log(`[Retention] processRetention complete. Processed: ${processedCount}, Sent: ${emailsSentCount}`);
   return { processed: processedCount, sent: emailsSentCount };
 }
 
@@ -277,14 +285,17 @@ async function startServer() {
 
     // Retention Emails Processing
     app.post("/api/admin/process-retention", async (req, res) => {
+      console.log("[Retention] [DEBUG] Endpoint hit!");
       try {
+        console.log("[Retention] Calling processRetention...");
         const result = await processRetention();
+        console.log("[Retention] Processing complete:", result);
         res.json({ success: true, processed: result.processed, sent: result.sent });
       } catch (error: any) {
-        console.error("[Retention] Error processing:", error);
+        console.error("[Retention] Error processing retention:", error);
         res.status(500).json({ 
           error: "Falha ao processar retenção",
-          details: error.message
+          details: error.message || "Erro desconhecido"
         });
       }
     });
@@ -346,6 +357,34 @@ async function startServer() {
           error: "Falha ao criar backup do banco de dados",
           details: error.message 
         });
+      }
+    });
+
+    // Database Restore Endpoint
+    app.post("/api/admin/restore-backup", async (req, res) => {
+      try {
+        const backupData = req.body;
+        const firestore = getDb();
+        const collections = ["users", "companies", "events"];
+        
+        console.log("[Restore] Starting database restore...");
+
+        for (const colName of collections) {
+          if (backupData[colName] && Array.isArray(backupData[colName])) {
+            console.log(`[Restore] Restoring ${backupData[colName].length} documents into ${colName}`);
+            for (const docData of backupData[colName]) {
+              if (docData.id) {
+                const docId = docData.id;
+                await firestore.collection(colName).doc(docId).set(docData, { merge: true });
+              }
+            }
+          }
+        }
+        console.log("[Restore] Backup restored successfully.");
+        res.json({ success: true, message: "Backup restaurado com sucesso" });
+      } catch (error: any) {
+        console.error("[Restore] Error restoring backup:", error);
+        res.status(500).json({ error: "Falha ao restaurar backup", details: error.message });
       }
     });
 
@@ -776,7 +815,7 @@ async function startServer() {
       app.use(vite.middlewares);
     }
 
-    cron.schedule('0 0 * * *', async () => {
+    cron.schedule('0 12 * * *', async () => {
       console.log('[Cron] Running daily retention process...');
       try {
         const result = await processRetention();

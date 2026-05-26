@@ -145,7 +145,7 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
             className="flex items-center gap-2 px-3 py-2 bg-brand-cyan text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-105 transition-all shadow-lg shadow-brand-cyan/20"
           >
             <span className="material-symbols-outlined text-sm">mail</span>
-            <span className="hidden sm:inline">Processar Retenção</span>
+            <span>{"Retenção"}</span>
           </button>
           <button 
             onClick={async () => {
@@ -175,8 +175,52 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
             className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-105 transition-all shadow-lg shadow-slate-800/20"
           >
             <span className="material-symbols-outlined text-sm">backup</span>
-            <span className="hidden sm:inline">Fazer Backup</span>
+            <span>{"Backup"}</span>
           </button>
+          
+          <input 
+            type="file" 
+            id="backup-input" 
+            className="hidden" 
+            accept=".json"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              
+              if (!confirm("Tem certeza? Isso irá SOBREESCREVER os dados atuais com os do arquivo selecionado.")) return;
+
+              setIsProcessing(true);
+              try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                const res = await fetch('/api/admin/restore-backup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) {
+                  const errData = await res.json();
+                  throw new Error(errData.error || "Erro desconhecido");
+                }
+                alert("Backup restaurado com sucesso!");
+                window.location.reload();
+              } catch (err: any) {
+                console.error("Erro na restauração:", err);
+                alert("Erro ao restaurar: " + err.message);
+              } finally {
+                setIsProcessing(false);
+                e.target.value = ''; // Reset input
+              }
+            }}
+          />
+          <button 
+            onClick={() => document.getElementById('backup-input')?.click()}
+            className="flex items-center gap-2 px-3 py-2 bg-purple-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-105 transition-all shadow-lg shadow-purple-800/20"
+          >
+            <span className="material-symbols-outlined text-sm">restore</span>
+            <span>{"Restaurar"}</span>
+          </button>
+
           <button 
             onClick={onLogout}
             className="p-2 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-full hover:bg-red-100 transition-colors"
@@ -367,7 +411,7 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
 
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden mt-8">
         <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-          <h2 className="text-sm font-black text-brand-navy dark:text-white uppercase tracking-widest">Últimos avisos de e-mail enviados</h2>
+          <h2 className="text-sm font-black text-brand-navy dark:text-white uppercase tracking-widest">Monitoração: E-mails enviados</h2>
           <span className="text-[10px] font-black text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full">{retentionLogs.length} total</span>
         </div>
         <div className="divide-y divide-slate-100 dark:divide-slate-800">

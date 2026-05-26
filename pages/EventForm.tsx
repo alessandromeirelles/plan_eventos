@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { EventStatus, InvoiceStatus } from '../types';
 import type { Company, PlanEvent, Expense } from '../types';
 import { getTodayString } from '../utils';
@@ -28,11 +28,19 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
   const [isManagingTypes, setIsManagingTypes] = useState(false);
   const [newTypeInput, setNewTypeInput] = useState('');
   
+  const pendingDate = localStorage.getItem('pendingEventDate');
+
+  useEffect(() => {
+    if (pendingDate) {
+      localStorage.removeItem('pendingEventDate');
+    }
+  }, [pendingDate]);
+
   const [formData, setFormData] = useState({
     id: initialData?.id || '',
     title: initialData?.title || '',
-    startDate: initialData?.date || getTodayString(),
-    endDate: initialData?.date || getTodayString(),
+    startDate: initialData?.date || pendingDate || getTodayString(),
+    endDate: initialData?.date || pendingDate || getTodayString(),
     time: initialData?.time || '',
     type: initialData?.type || (eventTypes[0] || ''),
     company_id: initialData?.company_id || (companies[0]?.id || ''),

@@ -584,8 +584,15 @@ const Dashboard: React.FC<Props> = ({ events, companies, onNavigate, trialDaysLe
               
               return (
                 <div key={day} className="aspect-square flex items-center justify-center cursor-pointer" onClick={() => {
-                  if (dayEvents.length > 0) setSelectedDateEvents(dayEvents);
-                }}>
+                  if (dayEvents.length > 0) {
+                    setSelectedDateEvents(dayEvents);
+                  } else {
+                    const dateStr = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                    localStorage.setItem('pendingEventDate', dateStr);
+                    onNavigate('NEW_EVENT');
+                  }
+                }}
+                >
                   <div 
                     className={`size-12 flex items-center justify-center rounded-full border-2 ${dayEvents.length > 0 ? 'border-transparent' : 'border-slate-100 dark:border-slate-800'}`}
                     style={{ backgroundColor: dayEvents.length > 0 ? 'transparent' : 'transparent' }}
