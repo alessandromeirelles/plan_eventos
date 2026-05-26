@@ -36,6 +36,8 @@ export interface PlanEvent {
   id: string;
   title: string;
   date: string;
+  startDate?: string;
+  endDate?: string;
   time?: string;
   location?: string;
   type: string;

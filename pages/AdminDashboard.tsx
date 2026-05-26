@@ -18,10 +18,23 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [retentionResult, setRetentionResult] = useState<{message: string, isError: boolean} | null>(null);
   const [extendingUserId, setExtendingUserId] = useState<string | null>(null);
+  const [retentionLogs, setRetentionLogs] = useState<any[]>([]);
 
   useEffect(() => {
     fetchUsers();
+    fetchRetentionLogs();
   }, []);
+
+  const fetchRetentionLogs = async () => {
+    try {
+      const logsRef = query(collection(db, 'retention_logs'), limit(10));
+      const logsSnap = await getDocs(logsRef);
+      const logs = logsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setRetentionLogs(logs);
+    } catch (error) {
+      console.error("Erro ao carregar logs de retenção:", error);
+    }
+  };
 
   useEffect(() => {
       if (!loading && users.length > 0) {
@@ -350,6 +363,30 @@ const AdminDashboard: React.FC<Props> = ({ onLogout, onNavigate }) => {
             )}
           </div>
         )}
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden mt-8">
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+          <h2 className="text-sm font-black text-brand-navy dark:text-white uppercase tracking-widest">Últimos avisos de e-mail enviados</h2>
+          <span className="text-[10px] font-black text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full">{retentionLogs.length} total</span>
+        </div>
+        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          {retentionLogs.length > 0 ? (
+            retentionLogs.map((log: any) => (
+              <div key={log.id} className="p-4 flex justify-between items-center text-sm">
+                <div>
+                  <p className="font-bold text-slate-800 dark:text-white">{log.user_name}</p>
+                  <p className="text-[10px] text-slate-500">{log.user_email} • {log.subject}</p>
+                </div>
+                <div className="text-[10px] text-slate-500 font-bold uppercase">
+                  {log.sent_at?.toDate().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="p-8 text-center text-slate-500 text-sm">Nenhum aviso enviado recentemente.</div>
+          )}
+        </div>
       </div>
 
       {/* Retention Modal */}

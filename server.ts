@@ -8,6 +8,7 @@ import path from "path";
 import fs from "fs";
 import { google } from "googleapis";
 import nodemailer from "nodemailer";
+import cron from "node-cron";
 
 // Initialize Firebase Admin lazily to prevent crashes if env vars are missing
 let db: admin.firestore.Firestore;
@@ -79,15 +80,24 @@ function getDb() {
   return db;
 }
 
-async function sendRetentionEmail(to: string, subject: string, text: string) {
-  const host = process.env.SMTP_HOST;
-  const port = parseInt(process.env.SMTP_PORT || "587");
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const from = process.env.SMTP_FROM || user;
+async function sendRetentionEmail(to: string, subject: string, text: string, html?: string) {
+  let smtpConfig: any = {};
+  if (process.env.SMTP_CONFIG) {
+    try {
+      smtpConfig = JSON.parse(process.env.SMTP_CONFIG);
+    } catch (e) {
+      console.error("[Email] Error parsing SMTP_CONFIG:", e);
+    }
+  }
+
+  const host = smtpConfig.host || process.env.SMTP_HOST;
+  const port = parseInt(smtpConfig.port || process.env.SMTP_PORT || "587");
+  const user = smtpConfig.user || process.env.SMTP_USER;
+  const pass = smtpConfig.pass || process.env.SMTP_PASS;
+  const from = smtpConfig.from || process.env.SMTP_FROM || user;
 
   if (!host || !user || !pass) {
-    console.warn("⚠️ SMTP credentials missing. Skipping email to:", to);
+    console.warn("⚠️ SMTP credentials missing (or SMTP_CONFIG invalid). Skipping email to:", to);
     return;
   }
 
@@ -99,7 +109,19 @@ async function sendRetentionEmail(to: string, subject: string, text: string) {
   });
 
   try {
-    await transporter.sendMail({ from, to, subject, text });
+    const emailOptions: any = {
+      from,
+      to,
+      subject,
+      text,
+      html,
+      attachments: [{
+        filename: 'logo.png',
+        path: path.join(process.cwd(), 'public', 'logo.png'),
+        cid: 'logo'
+      }]
+    };
+    await transporter.sendMail(emailOptions);
     console.log(`[Email] Sent to ${to}: ${subject}`);
   } catch (error) {
     console.error(`[Email] Failed to send to ${to}:`, error);
@@ -134,6 +156,92 @@ async function getGoogleAuthClient(userId: string) {
 
 const parser = new XMLParser();
 
+// Logo definition removed from here as it's now handled by CID attachment
+
+const createHtmlBody = (message: string) => `
+  <div style="font-family: sans-serif; padding: 20px; line-height: 1.5; color: #333;">
+    <img src="cid:logo" alt="Logo" style="width: 150px; margin-bottom: 20px;">
+    <p>${message.replace(/\n\n/g, '<br><br>')}</p>
+    <br>
+    <p>Cordialmente,<br><strong>Equipe Plan Eventos</strong></p>
+  </div>
+`;
+
+async function processRetention(): Promise<{processed: number, sent: number}> {
+  const firestore = getDb();
+  const usersSnap = await firestore.collection("users").get();
+  const docs = usersSnap.docs || [];
+  const now = new Date();
+  let processedCount = 0;
+  let emailsSentCount = 0;
+
+  for (const doc of docs) {
+    const userData = doc.data();
+    if (!userData.email || !userData.last_activity) continue;
+
+    const lastActivity = new Date(userData.last_activity);
+    const diffDays = Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
+    const emailsSent = userData.emails_sent || [];
+
+    let subject = "";
+    let text = "";
+    let html = "";
+    let key = "";
+    
+    if (diffDays >= 29 && !emailsSent.includes('29d')) {
+      key = '29d';
+      subject = "Que pena, seu trial vai expirar!";
+      text = `Olá ${userData.name},\n\nNotamos que você não aparece há algum tempo. Seu período de teste está chegando ao fim. Não perca a chance de continuar organizado!`;
+      html = createHtmlBody(text);
+    } else if (diffDays >= 21 && !emailsSent.includes('21d')) {
+      key = '21d';
+      subject = "O tempo está acabando!";
+      text = `Olá ${userData.name},\n\nO tempo voa! Já faz 21 dias que não te vemos. Volte agora e garanta sua organização.`;
+      html = createHtmlBody(text);
+    } else if (diffDays >= 14 && !emailsSent.includes('14d')) {
+      key = '14d';
+      subject = "Sentimos sua falta!";
+      text = `Olá ${userData.name},\n\nEstamos passando para te chamar de volta. O Planeventos está com novidades para te ajudar no dia a dia.`;
+      html = createHtmlBody(text);
+    } else if (diffDays >= 7 && !emailsSent.includes('7d')) {
+      key = '7d';
+      subject = "Dê uma chance para a organização!";
+      text = `Olá ${userData.name},\n\nDê uma chance para o aplicativo e você terá sucesso em se organizar. Estamos aqui para facilitar sua vida.`;
+      html = createHtmlBody(text);
+    } else if (diffDays >= 5 && !emailsSent.includes('5d')) {
+      key = '5d';
+      subject = "Sentimos sua falta!";
+      text = `Olá ${userData.name},\n\nJá se passaram 5 dias desde sua última visita. O Planeventos está com novidades para te ajudar no dia a dia.`;
+      html = createHtmlBody(text);
+    } else if (diffDays >= 3 && !emailsSent.includes('3d')) {
+      key = '3d';
+      subject = "Estamos sentindo saudades!";
+      text = `Olá ${userData.name},\n\nJá faz 3 dias que você não aparece. Tudo bem por aí? Volte e continue planejando seus eventos!`;
+      html = createHtmlBody(text);
+    }
+
+    if (key) {
+      await sendRetentionEmail(userData.email, subject, text, html);
+      await doc.ref.update({
+        emails_sent: admin.firestore.FieldValue.arrayUnion(key)
+      });
+      emailsSentCount++;
+      
+      // Log the sent email securely
+      await firestore.collection("retention_logs").add({
+        user_id: doc.id,
+        user_email: userData.email,
+        user_name: userData.name,
+        reason: key,
+        subject: subject,
+        sent_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    processedCount++;
+  }
+  return { processed: processedCount, sent: emailsSentCount };
+}
+
 async function startServer() {
   try {
     const app = express();
@@ -152,61 +260,26 @@ async function startServer() {
       res.json({ status: "ok", timestamp: new Date().toISOString() });
     });
 
+    // Endpoint de teste de e-mail 5d
+    app.get("/api/test-retention-email-5d", async (req, res) => {
+      try {
+        const to = "alessandromeirelles@gmail.com";
+        const subject = "Sentimos sua falta - 5 dias!";
+        const text = "Olá, notamos que você não entra no sistema há 5 dias. Volte para conferir suas novidades!";
+        const html = createHtmlBody(text);
+        
+        await sendRetentionEmail(to, subject, text, html);
+        res.json({ success: true, message: "E-mail de teste de 5 dias enviado!" });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     // Retention Emails Processing
     app.post("/api/admin/process-retention", async (req, res) => {
       try {
-        const firestore = getDb();
-        const usersSnap = await firestore.collection("users").get();
-        const docs = usersSnap.docs || [];
-        const now = new Date();
-        let processedCount = 0;
-        let emailsSentCount = 0;
-
-        for (const doc of docs) {
-          const userData = doc.data();
-          if (!userData.email || !userData.last_activity) continue;
-
-          const lastActivity = new Date(userData.last_activity);
-          const diffDays = Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
-          const emailsSent = userData.emails_sent || [];
-
-          let subject = "";
-          let text = "";
-          let key = "";
-
-          if (diffDays >= 29 && !emailsSent.includes('29d')) {
-            key = '29d';
-            subject = "Que pena, seu trial vai expirar!";
-            text = `Olá ${userData.name},\n\nNotamos que você não aparece há algum tempo. Seu período de teste está chegando ao fim. Não perca a chance de continuar organizado!`;
-          } else if (diffDays >= 21 && !emailsSent.includes('21d')) {
-            key = '21d';
-            subject = "O tempo está acabando!";
-            text = `Olá ${userData.name},\n\nO tempo voa! Já faz 21 dias que não te vemos. Volte agora e garanta sua organização.`;
-          } else if (diffDays >= 14 && !emailsSent.includes('14d')) {
-            key = '14d';
-            subject = "Sentimos sua falta!";
-            text = `Olá ${userData.name},\n\nEstamos passando para te chamar de volta. O Planeventos está com novidades para te ajudar no dia a dia.`;
-          } else if (diffDays >= 7 && !emailsSent.includes('7d')) {
-            key = '7d';
-            subject = "Dê uma chance para a organização!";
-            text = `Olá ${userData.name},\n\nDê uma chance para o aplicativo e você terá sucesso em se organizar. Estamos aqui para facilitar sua vida.`;
-          } else if (diffDays >= 3 && !emailsSent.includes('3d')) {
-            key = '3d';
-            subject = "Estamos sentindo saudades!";
-            text = `Olá ${userData.name},\n\nJá faz 3 dias que você não aparece. Tudo bem por aí? Volte e continue planejando seus eventos!`;
-          }
-
-          if (key) {
-            await sendRetentionEmail(userData.email, subject, text);
-            await doc.ref.update({
-              emails_sent: admin.firestore.FieldValue.arrayUnion(key)
-            });
-            emailsSentCount++;
-          }
-          processedCount++;
-        }
-
-        res.json({ success: true, processed: processedCount, sent: emailsSentCount });
+        const result = await processRetention();
+        res.json({ success: true, processed: result.processed, sent: result.sent });
       } catch (error: any) {
         console.error("[Retention] Error processing:", error);
         res.status(500).json({ 
@@ -702,6 +775,16 @@ async function startServer() {
       });
       app.use(vite.middlewares);
     }
+
+    cron.schedule('0 0 * * *', async () => {
+      console.log('[Cron] Running daily retention process...');
+      try {
+        const result = await processRetention();
+        console.log(`[Cron] Retention process complete. Processed: ${result.processed}, Sent: ${result.sent}`);
+      } catch (error) {
+        console.error('[Cron] Error running retention process:', error);
+      }
+    });
 
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://0.0.0.0:${PORT}`);

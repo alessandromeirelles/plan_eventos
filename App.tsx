@@ -121,6 +121,9 @@ const App: React.FC = () => {
               await updateDoc(userDocRef, { role: 'admin' });
             }
 
+            // Update last_activity
+            await updateDoc(userDocRef, { last_activity: new Date().toISOString() });
+
             if (userData.event_types) {
               setEventTypes(userData.event_types);
             }
@@ -223,27 +226,33 @@ const App: React.FC = () => {
     setCurrentView('LANDING');
   };
 
-  const handleSaveEvent = async (event: PlanEvent) => {
+  const handleSaveEvent = async (events: PlanEvent[]) => {
     if (!user?.email && !user?.uid) return;
     
-    // Save with both identifiers if possible, or prefer UID for better consistency
-    const eventData = { 
-      ...event, 
-      user_id: user.uid || user.email,
-      owner_email: user.email // Add this for redundancy
-    };
-    
     try {
-      if (event.id) {
-        await setDoc(doc(db, 'events', event.id), eventData as any, { merge: true });
-      } else {
-        const newDocRef = doc(collection(db, 'events'));
-        await setDoc(newDocRef, { ...eventData, id: newDocRef.id });
+      for (const event of events) {
+        // Save with both identifiers if possible, or prefer UID for better consistency
+        const eventData = { 
+          ...event, 
+          user_id: user.uid || user.email,
+          owner_email: user.email // Add this for redundancy
+        };
         
-        // Sincronizar com Google Calendar se conectado
-        if (user.google_calendar_connected) {
-          const { syncEventToGoogle } = await import('./googleCalendarService');
-          await syncEventToGoogle({ ...eventData, id: newDocRef.id }, user.uid!);
+        if (event.id && event.id.startsWith('EV-')) {
+          // If it started as a new event and has a generated ID, we might need to treat it differently? 
+          // Actually, in the loop, I am generating new IDs for all events in the range, except the first one.
+          // Let's just create them in Firestore.
+          await setDoc(doc(db, 'events', event.id), eventData as any, { merge: true });
+        } else {
+          const newDocRef = doc(collection(db, 'events'));
+          const eventDataWithId = { ...eventData, id: newDocRef.id };
+          await setDoc(newDocRef, eventDataWithId);
+          
+          // Sincronizar com Google Calendar se conectado
+          if (user.google_calendar_connected) {
+            const { syncEventToGoogle } = await import('./googleCalendarService');
+            await syncEventToGoogle(eventDataWithId, user.uid!);
+          }
         }
       }
       setCurrentView('EVENTS');

@@ -19,7 +19,7 @@ interface Props {
   eventTypes: string[];
   onUpdateEventTypes: (newTypes: string[]) => void;
   initialData?: PlanEvent;
-  onSave: (event: PlanEvent) => void;
+  onSave: (events: PlanEvent[]) => void;
   onCancel: () => void;
   onNewCompany: () => void;
 }
@@ -29,9 +29,10 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
   const [newTypeInput, setNewTypeInput] = useState('');
   
   const [formData, setFormData] = useState({
-    id: initialData?.id || 'EV-' + Math.floor(1000 + Math.random() * 9000),
+    id: initialData?.id || '',
     title: initialData?.title || '',
-    date: initialData?.date || getTodayString(),
+    startDate: initialData?.date || getTodayString(),
+    endDate: initialData?.date || getTodayString(),
     time: initialData?.time || '',
     type: initialData?.type || (eventTypes[0] || ''),
     company_id: initialData?.company_id || (companies[0]?.id || ''),
@@ -82,10 +83,20 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
       finalData.invoice_url = URL.createObjectURL(invoiceFile);
     }
 
-    onSave({
-      ...initialData,
-      ...finalData
-    } as PlanEvent);
+    const start = new Date(finalData.startDate + 'T00:00:00');
+    const end = new Date(finalData.endDate + 'T00:00:00');
+    const events: PlanEvent[] = [];
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+        events.push({
+            ...finalData,
+            id: initialData?.id && dateStr === finalData.startDate ? initialData.id : 'EV-' + Math.floor(1000 + Math.random() * 9000),
+            date: dateStr,
+        } as PlanEvent);
+    }
+
+    onSave(events);
   };
 
   const handleAddType = () => {
@@ -198,15 +209,25 @@ const EventForm: React.FC<Props> = ({ companies, eventTypes, onUpdateEventTypes,
               />
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Data</label>
+                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Início</label>
                 <input 
                   type="date"
                   required
                   className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary dark:text-white"
-                  value={formData.date}
-                  onChange={e => setFormData({...formData, date: e.target.value})}
+                  value={formData.startDate}
+                  onChange={e => setFormData({...formData, startDate: e.target.value})}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Término</label>
+                <input 
+                  type="date"
+                  required
+                  className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary dark:text-white"
+                  value={formData.endDate}
+                  onChange={e => setFormData({...formData, endDate: e.target.value})}
                 />
               </div>
               <div className="space-y-1.5">
